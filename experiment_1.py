@@ -19,9 +19,9 @@ BOARD_SIZE = 2
 
 RESULT_TEMPLATE = """
 本次共计得分：{}
-选择正确{}个，正确率：{}
-选择错误{}个，错误率：{}
-漏选{}个，漏选率：{}
+选择正确{}个，正确率：{}%
+选择错误{}个，错误率：{}%
+漏选{}个，漏选率：{}%
 """.strip()
 RESULT_HEADERS = ["Turn", "Elapse", "Result"]
 
@@ -68,9 +68,9 @@ class Summary:
 
     @property
     def result_args(self):
-        correct_rate = round(self.correct * 100 / self.total, 1)
-        wrong_rate = round(self.correct * 100 / self.total, 1)
-        miss_rate = round(100 - correct_rate - wrong_rate, 1)
+        correct_rate = round(self.correct * 100 / self.total)
+        wrong_rate = round(self.wrong * 100 / self.total)
+        miss_rate = round(100 - correct_rate - wrong_rate)
         return self.correct, self.correct, correct_rate, self.wrong, wrong_rate, self.miss, miss_rate
 
 
@@ -84,7 +84,7 @@ PROMPT2IMAGE = {
         "当你看到狮子或老虎时请按下按钮": ["lion.jpg", "tiger.jpg"]
     },
     Step.no_go: {
-        "当你看到不是大象的动物时不要按下按钮": ["giraffe.jpg"]
+        "当你看到不是大象的动物时按下按钮": ["giraffe.jpg"]
     }
 }
 
@@ -100,6 +100,7 @@ class Experiment1Widget(QWidget):
         super().__init__()
         self.step = Step.go
 
+        self.images = []
         self.prompt = QLabel("Prompt Area")
         self.image = QLabel("Image Area")
         self.button = QPushButton("Start!")
@@ -188,6 +189,7 @@ class Experiment1Widget(QWidget):
         self.set_prompt(random.choice(list(PROMPT2IMAGE[self.step])))
         self.set_score(0)
 
+        self.images = IMAGE_FILES[self.step].copy() * MAX_TURN
         self.image.setText("Image Area")
         self.table.hide()
         self.button.setText("Match!")
@@ -206,14 +208,15 @@ class Experiment1Widget(QWidget):
         self.button.setEnabled(False)
 
     def __show(self):
-        self.set_image(random.choice(IMAGE_FILES[self.step]))
+        image = self.images.pop(random.randint(0, len(self.images) - 1))
+        self.set_image(image)
         self.summary.record()
 
         self.button.setEnabled(True)
         QTimer.singleShot(SHOW_TIME, self.__pause)
 
     def __pause(self):
-        self.image.setText("Image Area")
+        self.image.setText("")
         if self.summary.total < MAX_TURN:
             QTimer.singleShot(PAUSE_TIME, self.__show)
         else:
