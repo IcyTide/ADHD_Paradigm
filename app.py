@@ -28,7 +28,7 @@ class MainWindow(QMainWindow):
         layout.setStretchFactor(self.tab_widget, 1)
 
         self.experiment_1_widget = Experiment1Widget()
-        self.tab_widget.addTab(self.experiment_1_widget, "Go-nogo")
+        self.tab_widget.addTab(self.experiment_1_widget, "Go-no_go")
 
 
 if __name__ == "__main__":

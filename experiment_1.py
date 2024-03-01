@@ -1,9 +1,10 @@
 import os
 import random
-import time
 from enum import Enum
+import time
 
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QPushButton, QLabel
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QPushButton, QLabel, QTableWidget, QAbstractItemView, \
+    QTableWidgetItem, QHeaderView, QHBoxLayout
 from PySide6.QtGui import QPixmap, Qt
 from PySide6.QtCore import QTimer
 
@@ -11,14 +12,66 @@ READY_TIME = 3000
 SHOW_TIME = 800
 PAUSE_TIME = 200
 
-MAX_TURN = 24
+MAX_TURN = 4
 
 BOARD_SIZE = 2
+
+
+RESULT_TEMPLATE = """
+本次共计得分：{}
+选择正确{}个，正确率：{}
+选择错误{}个，错误率：{}
+漏选{}个，漏选率：{}
+""".strip()
+RESULT_HEADERS = ["Turn", "Elapse", "Result"]
 
 
 class Step(Enum):
     go = 0
     no_go = 1
+
+
+class ClickType(Enum):
+    miss = 0
+    correct = 1
+    wrong = 2
+
+
+class Summary:
+    def __init__(self):
+        self.records = []
+        self.start_time = 0
+
+        self.correct = 0
+        self.wrong = 0
+
+    @property
+    def total(self):
+        return len(self.records)
+
+    @property
+    def miss(self):
+        return self.total - self.correct - self.wrong
+
+    def record(self, correct=None):
+        if correct is None:
+            self.records.append((SHOW_TIME, "miss"))
+            self.start_time = time.time()
+        elif correct:
+            cost_time = int(1000 * (time.time() - self.start_time))
+            self.records[-1] = (cost_time, "correct")
+            self.correct += 1
+        else:
+            cost_time = int(1000 * (time.time() - self.start_time))
+            self.records[-1] = (cost_time, "wrong")
+            self.wrong += 1
+
+    @property
+    def result_args(self):
+        correct_rate = round(self.correct * 100 / self.total, 1)
+        wrong_rate = round(self.correct * 100 / self.total, 1)
+        miss_rate = round(100 - correct_rate - wrong_rate, 1)
+        return self.correct, self.correct, correct_rate, self.wrong, wrong_rate, self.miss, miss_rate
 
 
 IMAGE_FOLDER = {
@@ -31,7 +84,7 @@ PROMPT2IMAGE = {
         "当你看到狮子或老虎时请按下按钮": ["lion.jpg", "tiger.jpg"]
     },
     Step.no_go: {
-        "当你看到大象时不要按下按钮": ["giraffe.jpg"]
+        "当你看到不是大象的动物时不要按下按钮": ["giraffe.jpg"]
     }
 }
 
@@ -40,21 +93,21 @@ class Experiment1Widget(QWidget):
     is_start = False
     current_image = ""
     current_prompt = ""
-    current_score = 0
-    current_turn = 1
+
+    summary = None
 
     def __init__(self):
         super().__init__()
         self.step = Step.go
 
-        self.prompt = QLabel()
-        self.image = QLabel()
-        self.button = QPushButton()
+        self.prompt = QLabel("Prompt Area")
+        self.image = QLabel("Image Area")
+        self.button = QPushButton("Start!")
+        self.table = QTableWidget()
         self.scoreboard = QLabel("Score:0")
-        self.init_ui()
         self.build_ui()
 
-        self.button.clicked.connect(self.click)
+        self.button.clicked.connect(self.__click)
 
     def build_ui(self):
         layout = QVBoxLayout()
@@ -68,13 +121,24 @@ class Experiment1Widget(QWidget):
         self.prompt.setStyleSheet(F"border: {BOARD_SIZE}px solid black")
         layout.addWidget(self.prompt, 1)
 
+        h_layout = QHBoxLayout()
+
         self.image.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.image.setWordWrap(True)
         font = self.image.font()
-        font.setPointSize(60)
+        font.setPointSize(30)
         self.image.setFont(font)
         self.image.setStyleSheet(F"border: {BOARD_SIZE} solid black")
-        layout.addWidget(self.image, 3)
+        h_layout.addWidget(self.image, 2)
+
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.table.setColumnCount(len(RESULT_HEADERS))
+        self.table.setHorizontalHeaderLabels(RESULT_HEADERS)
+        self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        h_layout.addWidget(self.table, 1)
+        self.table.hide()
+
+        layout.addLayout(h_layout, 3)
 
         font = self.button.font()
         font.setPointSize(30)
@@ -88,10 +152,16 @@ class Experiment1Widget(QWidget):
         self.scoreboard.setFont(font)
         layout.addWidget(self.scoreboard, 1)
 
-    def init_ui(self):
-        self.prompt.setText("Prompt Area")
-        self.image.setText("Image Area")
-        self.button.setText("Start!")
+    def set_table(self):
+        self.table.setRowCount(self.summary.total)
+
+        for i, row in enumerate(self.summary.records):
+            self.table.setItem(i, 0, QTableWidgetItem(str(i + 1)))
+            for j, e in enumerate(row):
+                self.table.setItem(i, j + 1, QTableWidgetItem(str(e)))
+        self.table.resizeColumnsToContents()
+
+        self.table.show()
 
     def set_image(self, image):
         self.current_image = image
@@ -106,47 +176,56 @@ class Experiment1Widget(QWidget):
         self.prompt.setText(prompt)
 
     def set_score(self, score):
-        self.current_score = score
         self.scoreboard.setText(f"Score:{score}")
 
-    def start(self):
+    def __click(self):
+        if self.is_start:
+            self.__trigger()
+        else:
+            self.__start()
+
+    def __start(self):
         self.set_prompt(random.choice(list(PROMPT2IMAGE[self.step])))
         self.set_score(0)
+
+        self.image.setText("Image Area")
+        self.table.hide()
         self.button.setText("Match!")
-
-        self.is_start = True
-        self.current_turn = 1
-        QTimer.singleShot(READY_TIME, self.show)
-
-    def click(self):
-        if self.is_start:
-            self.trigger()
-        else:
-            self.start()
-
-    def trigger(self):
-        if self.current_image in PROMPT2IMAGE[self.step][self.current_prompt]:
-            self.current_score += 1
-            self.set_score(self.current_score)
-
         self.button.setEnabled(False)
 
-    def show(self):
-        self.set_image(random.choice(IMAGE_FILES[self.step]))
-        self.button.setEnabled(True)
-        QTimer.singleShot(SHOW_TIME, self.pause)
+        self.is_start = True
+        self.summary = Summary()
+        QTimer.singleShot(READY_TIME, self.__show)
 
-    def pause(self):
-        self.image.setText("Image Area")
-        self.current_turn += 1
-        if self.current_turn > MAX_TURN:
-            QTimer.singleShot(PAUSE_TIME, self.stop)
+    def __trigger(self):
+        if self.current_image in PROMPT2IMAGE[self.step][self.current_prompt]:
+            self.summary.record(True)
+            self.set_score(self.summary.correct)
         else:
-            QTimer.singleShot(PAUSE_TIME, self.show)
+            self.summary.record(False)
+        self.button.setEnabled(False)
 
-    def stop(self):
-        self.init_ui()
+    def __show(self):
+        self.set_image(random.choice(IMAGE_FILES[self.step]))
+        self.summary.record()
+
+        self.button.setEnabled(True)
+        QTimer.singleShot(SHOW_TIME, self.__pause)
+
+    def __pause(self):
+        self.image.setText("Image Area")
+        if self.summary.total < MAX_TURN:
+            QTimer.singleShot(PAUSE_TIME, self.__show)
+        else:
+            QTimer.singleShot(PAUSE_TIME, self.__stop)
+
+    def __stop(self):
         self.is_start = False
+        self.button.setText("Start!")
+        self.image.setText(
+            RESULT_TEMPLATE.format(*self.summary.result_args)
+        )
+        self.set_table()
         self.button.setEnabled(True)
         if self.step == Step.go:
             self.step = Step.no_go
