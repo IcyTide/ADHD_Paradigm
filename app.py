@@ -1,4 +1,5 @@
-from PySide6.QtWidgets import QApplication, QMainWindow, QStyleFactory, QMessageBox, QVBoxLayout, QWidget, QTabWidget
+from PySide6.QtGui import QIcon
+from PySide6.QtWidgets import QApplication, QMainWindow, QStyleFactory, QVBoxLayout, QWidget, QTabWidget
 import sys
 
 from experiment_1 import Experiment1Widget
@@ -10,8 +11,8 @@ class MainWindow(QMainWindow):
 
         self.setWindowTitle("Paradigm")
 
-        # icon = QIcon("qt/assets/icon.ico")
-        # self.setWindowIcon(icon)
+        icon = QIcon("qt/assets/icon.ico")
+        self.setWindowIcon(icon)
         # self.message_box = QMessageBox()
         #
         # self.message_box.setWindowIcon(icon)

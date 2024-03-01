@@ -28,10 +28,10 @@ IMAGE_FOLDER = {
 IMAGE_FILES = {k: os.listdir(v) for k, v in IMAGE_FOLDER.items()}
 PROMPT2IMAGE = {
     Step.go: {
-        "当你看到狮子或老虎时请按下按钮": ["狮子.jpg", "老虎.jpg"]
+        "当你看到狮子或老虎时请按下按钮": ["lion.jpg", "tiger.jpg"]
     },
     Step.no_go: {
-        "当你看到大象时不要按下按钮": []
+        "当你看到大象时不要按下按钮": ["giraffe.jpg"]
     }
 }
 
