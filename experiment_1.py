@@ -216,7 +216,7 @@ class Experiment1Widget(QWidget):
         QTimer.singleShot(SHOW_TIME, self.__pause)
 
     def __pause(self):
-        self.image.setText("")
+        self.image.clear()
         if self.summary.total < MAX_TURN:
             QTimer.singleShot(PAUSE_TIME, self.__show)
         else:
