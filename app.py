@@ -11,7 +11,7 @@ class MainWindow(QMainWindow):
 
         self.setWindowTitle("Paradigm")
 
-        icon = QIcon("qt/assets/icon.ico")
+        icon = QIcon("assets/icon.ico")
         self.setWindowIcon(icon)
         # self.message_box = QMessageBox()
         #
