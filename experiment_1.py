@@ -14,44 +14,39 @@ class Step(Enum):
     no_go = 1
 
 
-class Summary:
-    def __init__(self):
-        self.records = []
-        self.start_time = 0
+IMAGE_FOLDER = {
+    Step.go: "assets/go",
+    Step.no_go: "assets/no_go"
+}
+IMAGE_FILES = {k: os.listdir(v) for k, v in IMAGE_FOLDER.items()}
+PRACTICE_START_PROMPTS = [
+    "小朋友，你看到狮子或者老虎时请按下按键，如果你选择对了得1分，错误不得分",
+    "小朋友，你看到大象以外得其他动物时请按下按键，如果你选择对了得1分，错误不得分"
+]
+PRACTICE_FINISH_PROMPTS = [
+    "如果你已经知道怎么游戏，请点击继续",
+    "如果你已经知道怎么游戏，请点击正式开始"
+]
+TEST_PROMPTS = {
+    Step.go: "当你看到狮子或老虎时请按下按钮",
+    Step.no_go: "当你看到不是大象的动物时请按下按钮"
+}
 
-        self.correct = 0
-        self.wrong = 0
-        self.miss = 0
+PROMPT2IMAGE = {
+    PRACTICE_START_PROMPTS[0]: ["lion.jpg", "tiger.jpg"],
+    PRACTICE_START_PROMPTS[1]: ["giraffe.jpg"],
 
-    @property
-    def total(self):
-        return len(self.records)
+    TEST_PROMPTS[Step.go]: ["lion.jpg", "tiger.jpg"],
+    TEST_PROMPTS[Step.no_go]: ["giraffe.jpg"],
+}
 
-    def record(self, correct):
-        if correct == "miss":
-            self.records.append((SHOW_TIME, correct))
-            self.start_time = time.time()
-            self.miss += 1
-        elif correct == "pass":
-            self.records.append((SHOW_TIME, correct))
-            self.start_time = time.time()
-        elif correct:
-            cost_time = int(1000 * (time.time() - self.start_time))
-            self.records[-1] = (cost_time, "correct")
-            self.correct += 1
-            self.miss -= 1
-        else:
-            cost_time = int(1000 * (time.time() - self.start_time))
-            self.records[-1] = (cost_time, "wrong")
-            self.wrong += 1
-
-    @property
-    def result_args(self):
-        correct_rate = round(self.correct * 100 / self.total)
-        wrong_rate = round(self.wrong * 100 / self.total)
-        miss_rate = round(self.miss * 100 / self.total)
-        return self.correct, self.correct, correct_rate, self.wrong, wrong_rate, self.miss, miss_rate
-
+RESULT_TEMPLATE = """
+本次共计得分：{}
+选择正确{}个，正确率：{}%
+选择错误{}个，错误率：{}%
+漏选{}个，漏选率：{}%
+""".strip()
+RESULT_HEADERS = ["Turn", "Elapse", "Result"]
 
 READY_TIME = 3000
 SHOW_TIME = 800
@@ -63,37 +58,48 @@ TEST_EPOCH = 2
 
 BOARD_SIZE = 2
 
-RESULT_TEMPLATE = """
-本次共计得分：{}
-选择正确{}个，正确率：{}%
-选择错误{}个，错误率：{}%
-漏选{}个，漏选率：{}%
-""".strip()
-RESULT_HEADERS = ["Turn", "Elapse", "Result"]
 
-IMAGE_FOLDER = {
-    Step.go: "assets/go",
-    Step.no_go: "assets/no_go"
-}
-IMAGE_FILES = {k: os.listdir(v) for k, v in IMAGE_FOLDER.items()}
-PROMPT2IMAGE = {
-    Step.go: {
-        "当你看到狮子或老虎时请按下按钮": ["lion.jpg", "tiger.jpg"],
-        "小朋友，你看到狮子或者老虎时请按下按键，如果你选择对了得1分，错误不得分": ["lion.jpg", "tiger.jpg"]
-    },
-    Step.no_go: {
-        "当你看到不是大象的动物时请按下按钮": ["giraffe.jpg"],
-        "小朋友，你看到大象以外得其他动物时请按下按键，如果你选择对了得1分，错误不得分": ["giraffe.jpg"]
-    }
-}
-PRACTICE_START_PROMPTS = [
-    "小朋友，你看到狮子或者老虎时请按下按键，如果你选择对了得1分，错误不得分",
-    "小朋友，你看到大象以外得其他动物时请按下按键，如果你选择对了得1分，错误不得分"
-]
-PRACTICE_FINISH_PROMPTS = [
-    "如果你已经知道怎么游戏，请点击继续",
-    "如果你已经知道怎么游戏，请点击正式开始"
-]
+class Summary:
+    def __init__(self):
+        self.records = []
+        self.start_time = 0
+
+        self.correct_count = 0
+        self.wrong_count = 0
+        self.miss_count = 0
+        self.pass_count = 0
+
+    @property
+    def total(self):
+        return len(self.records)
+
+    def record(self, correct):
+        if correct == "miss":
+            self.records.append((SHOW_TIME, correct))
+            self.start_time = time.time()
+            self.miss_count += 1
+        elif correct == "pass":
+            self.records.append((SHOW_TIME, correct))
+            self.start_time = time.time()
+            self.pass_count += 1
+        elif correct:
+            cost_time = int(1000 * (time.time() - self.start_time))
+            self.records[-1] = (cost_time, "correct")
+            self.correct_count += 1
+            self.miss_count -= 1
+        else:
+            cost_time = int(1000 * (time.time() - self.start_time))
+            self.records[-1] = (cost_time, "wrong")
+            self.wrong_count += 1
+            self.pass_count -= 1
+
+    @property
+    def result_args(self):
+        correct_rate = round(self.correct_count * 100 / self.total)
+        wrong_rate = round(self.wrong_count * 100 / self.total)
+        miss_rate = round(self.miss_count * 100 / self.total)
+        return (self.correct_count, self.correct_count, correct_rate, self.wrong_count, wrong_rate,
+                self.miss_count, miss_rate)
 
 
 class Experiment1Widget(QWidget):
@@ -247,7 +253,7 @@ class Experiment1Widget(QWidget):
     def start_test(self):
         self.__start()
         self.current_epoch += 1
-        self.set_prompt(random.choice(list(PROMPT2IMAGE[self.step])[:-1]))
+        self.set_prompt(TEST_PROMPTS[self.step])
         QTimer.singleShot(READY_TIME, self.__show)
 
     def switch_test(self):
@@ -266,7 +272,7 @@ class Experiment1Widget(QWidget):
         self.prepare_test()
 
     def __trigger(self):
-        if self.current_image in PROMPT2IMAGE[self.step][self.current_prompt]:
+        if self.current_image in PROMPT2IMAGE[self.current_prompt]:
             self.summary.record(True)
         else:
             self.summary.record(False)
@@ -279,7 +285,7 @@ class Experiment1Widget(QWidget):
 
         image = self.images.pop(random.randint(0, len(self.images) - 1))
         self.set_image(image)
-        if image in PROMPT2IMAGE[self.step][self.current_prompt]:
+        if image in PROMPT2IMAGE[self.current_prompt]:
             self.summary.record("miss")
         else:
             self.summary.record("pass")
