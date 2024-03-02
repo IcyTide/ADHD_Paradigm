@@ -5,7 +5,7 @@ import time
 
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QPushButton, QLabel, QTableWidget, QAbstractItemView, \
     QTableWidgetItem, QHeaderView, QHBoxLayout
-from PySide6.QtGui import QPixmap, Qt
+from PySide6.QtGui import QPixmap, Qt, QKeySequence
 from PySide6.QtCore import QTimer
 
 
@@ -57,9 +57,9 @@ READY_TIME = 3000
 SHOW_TIME = 800
 PAUSE_TIME = 200
 
-PRACTICE_TURN = 20
-TEST_TURN = 24
-TEST_EPOCH = 6
+PRACTICE_TURN = 2
+TEST_TURN = 2
+TEST_EPOCH = 2
 
 BOARD_SIZE = 2
 
@@ -86,13 +86,13 @@ PROMPT2IMAGE = {
         "小朋友，你看到大象以外得其他动物时请按下按键，如果你选择对了得1分，错误不得分": ["giraffe.jpg"]
     }
 }
-PRACTICE_PROMPTS = [
+PRACTICE_START_PROMPTS = [
     "小朋友，你看到狮子或者老虎时请按下按键，如果你选择对了得1分，错误不得分",
     "小朋友，你看到大象以外得其他动物时请按下按键，如果你选择对了得1分，错误不得分"
 ]
-PRACTICE_FINISH_TEXTS = [
-    "如果你已经知道怎么游戏，请点击继续按键",
-    "如果你已经知道怎么游戏，那么我们可以正式开始"
+PRACTICE_FINISH_PROMPTS = [
+    "如果你已经知道怎么游戏，请点击继续",
+    "如果你已经知道怎么游戏，请点击正式开始"
 ]
 
 
@@ -116,11 +116,10 @@ class Experiment1Widget(QWidget):
         self.stop_func = self.stop_practice_1
 
         self.images = []
-        self.prompt = QLabel()
-        self.image = QLabel()
+        self.display = QLabel()
         self.button = QPushButton()
         self.table = QTableWidget()
-        self.scoreboard = QLabel()
+
         self.build_ui()
 
         self.prepare_practice_1()
@@ -131,23 +130,15 @@ class Experiment1Widget(QWidget):
         layout = QVBoxLayout()
         self.setLayout(layout)
 
-        self.prompt.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.prompt.setWordWrap(True)
-        font = self.prompt.font()
-        font.setPointSize(30)
-        self.prompt.setFont(font)
-        self.prompt.setStyleSheet(F"border: {BOARD_SIZE}px solid black")
-        layout.addWidget(self.prompt, 1)
-
         h_layout = QHBoxLayout()
 
-        self.image.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.image.setWordWrap(True)
-        font = self.image.font()
+        self.display.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.display.setWordWrap(True)
+        font = self.display.font()
         font.setPointSize(30)
-        self.image.setFont(font)
-        self.image.setStyleSheet(F"border: {BOARD_SIZE} solid black")
-        h_layout.addWidget(self.image, 2)
+        self.display.setFont(font)
+        self.display.setStyleSheet(F"border: {BOARD_SIZE} solid black")
+        h_layout.addWidget(self.display, 2)
 
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.table.setColumnCount(len(RESULT_HEADERS))
@@ -156,19 +147,12 @@ class Experiment1Widget(QWidget):
         h_layout.addWidget(self.table, 1)
         self.table.hide()
 
-        layout.addLayout(h_layout, 3)
+        layout.addLayout(h_layout, 4)
 
         font = self.button.font()
         font.setPointSize(30)
         self.button.setFont(font)
         layout.addWidget(self.button, 1)
-
-        self.scoreboard.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.scoreboard.setWordWrap(True)
-        font = self.scoreboard.font()
-        font.setPointSize(30)
-        self.scoreboard.setFont(font)
-        layout.addWidget(self.scoreboard, 1)
 
     def set_table(self):
         self.table.setRowCount(self.summary.total)
@@ -184,18 +168,14 @@ class Experiment1Widget(QWidget):
     def set_image(self, image):
         self.current_image = image
         pix_map = QPixmap(os.path.join(IMAGE_FOLDER[self.step], image)).scaled(
-            self.image.width() - BOARD_SIZE * 2, self.image.height() - BOARD_SIZE * 2,
+            self.display.width() - BOARD_SIZE * 2, self.display.height() - BOARD_SIZE * 4,
             Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation
         )
-        self.image.setPixmap(pix_map)
+        self.display.setPixmap(pix_map)
 
     def set_prompt(self, prompt):
         self.current_prompt = prompt
-        self.prompt.setText(prompt)
-
-    def set_score(self):
-        score = self.summary.correct
-        self.scoreboard.setText(f"Score:{score}")
+        self.display.setText(prompt)
 
     def __click(self):
         if self.is_start:
@@ -203,83 +183,71 @@ class Experiment1Widget(QWidget):
         else:
             self.start_func()
 
-    def prepare_practice_1(self):
-        self.step = Step.go
-        self.set_prompt(PRACTICE_PROMPTS[0])
+    def __prepare(self, button="开始"):
         self.summary = Summary()
-        self.set_score()
-        self.image.setText("Image Area")
-        self.button.setText("开始")
+        self.button.setText(button)
         self.button.setEnabled(True)
-        self.start_func = self.start_practice_1
 
-    def start_practice_1(self):
+    def __start(self):
         self.images = IMAGE_FILES[self.step].copy() * PRACTICE_TURN
         self.button.setText("Match!")
+        self.button.setShortcut(QKeySequence(' '))
         self.button.setEnabled(False)
         self.is_start = True
+
+    def __stop(self, button="开始", table=False):
+        self.is_start = False
+        self.table.hide()
+        self.button.setText(button)
+        self.button.setShortcut(QKeySequence())
+        self.button.setEnabled(True)
+        self.display.setText(
+            RESULT_TEMPLATE.format(*self.summary.result_args)
+        )
+        if table:
+            self.set_table()
+
+    def prepare_practice_1(self):
+        self.step = Step.go
+        self.start_func = self.start_practice_1
+        self.set_prompt(PRACTICE_START_PROMPTS[0])
+        self.__prepare()
+
+    def start_practice_1(self):
         self.stop_func = self.stop_practice_1
+        self.__start()
         self.__show()
 
     def stop_practice_1(self):
-        self.button.setText("继续")
-        self.button.setEnabled(True)
-        self.is_start = False
-        self.set_prompt(PRACTICE_FINISH_TEXTS[0])
-        self.image.setText(
-            RESULT_TEMPLATE.format(*self.summary.result_args)
-        )
         self.start_func = self.prepare_practice_2
+        self.__stop(PRACTICE_FINISH_PROMPTS[0])
 
     def prepare_practice_2(self):
         self.step = Step.no_go
-        self.set_prompt(PRACTICE_PROMPTS[1])
-        self.summary = Summary()
-        self.set_score()
-        self.image.setText("Image Area")
-        self.button.setText("开始")
-        self.button.setEnabled(True)
         self.start_func = self.start_practice_2
+        self.set_prompt(PRACTICE_START_PROMPTS[1])
+        self.__prepare()
 
     def start_practice_2(self):
-        self.images = IMAGE_FILES[self.step].copy() * PRACTICE_TURN
-        self.button.setText("Match!")
-        self.button.setEnabled(False)
-        self.is_start = True
         self.stop_func = self.stop_practice_2
+        self.__start()
         self.__show()
 
     def stop_practice_2(self):
-        self.button.setText("继续")
-        self.button.setEnabled(True)
-        self.is_start = False
-        self.set_prompt(PRACTICE_FINISH_TEXTS[1])
-        self.image.setText(
-            RESULT_TEMPLATE.format(*self.summary.result_args)
-        )
+        self.__stop(PRACTICE_FINISH_PROMPTS[1])
         self.prepare_test()
 
     def prepare_test(self):
         self.step = Step.go
-        self.button.setText("开始测试")
-        self.button.setEnabled(True)
-        self.summary = Summary()
-        self.set_score()
+        self.current_epoch = 0
         self.start_func = self.start_test
         self.stop_func = self.switch_test
-
-        self.current_epoch = 0
+        self.__prepare()
 
     def start_test(self):
-        self.set_prompt(random.choice(list(PROMPT2IMAGE[self.step])[:-1]))
-        self.image.setText("Image Area")
-        self.table.hide()
-        self.images = IMAGE_FILES[self.step].copy() * PRACTICE_TURN
-        self.button.setText("Match!")
-        self.button.setEnabled(False)
-        self.is_start = True
-
+        self.__start()
         self.current_epoch += 1
+        self.set_prompt(random.choice(list(PROMPT2IMAGE[self.step])[:-1]))
         QTimer.singleShot(READY_TIME, self.__show)
 
     def switch_test(self):
@@ -294,20 +262,12 @@ class Experiment1Widget(QWidget):
             self.start_test()
 
     def stop_test(self):
-        self.button.setText("继续")
-        self.button.setEnabled(True)
-        self.is_start = False
-        self.set_prompt(PRACTICE_FINISH_TEXTS[1])
-        self.image.setText(
-            RESULT_TEMPLATE.format(*self.summary.result_args)
-        )
-        self.set_table()
+        self.__stop(table=True)
         self.prepare_test()
 
     def __trigger(self):
         if self.current_image in PROMPT2IMAGE[self.step][self.current_prompt]:
             self.summary.record(True)
-            self.set_score()
         else:
             self.summary.record(False)
         self.button.setEnabled(False)
@@ -329,5 +289,6 @@ class Experiment1Widget(QWidget):
 
     def __pause(self):
         self.current_image = None
-        self.image.clear()
+        self.display.clear()
+        self.button.setEnabled(False)
         QTimer.singleShot(PAUSE_TIME, self.__show)
