@@ -31,12 +31,6 @@ class Step(Enum):
     no_go = 1
 
 
-class ClickType(Enum):
-    miss = 0
-    correct = 1
-    wrong = 2
-
-
 class Summary:
     def __init__(self):
         self.records = []
@@ -84,7 +78,7 @@ PROMPT2IMAGE = {
         "当你看到狮子或老虎时请按下按钮": ["lion.jpg", "tiger.jpg"]
     },
     Step.no_go: {
-        "当你看到不是大象的动物时按下按钮": ["giraffe.jpg"]
+        "当你看到不是大象的动物时请按下按钮": ["giraffe.jpg"]
     }
 }
 
@@ -208,6 +202,10 @@ class Experiment1Widget(QWidget):
         self.button.setEnabled(False)
 
     def __show(self):
+        if not self.images:
+            self.__stop()
+            return
+
         image = self.images.pop(random.randint(0, len(self.images) - 1))
         self.set_image(image)
         self.summary.record()
@@ -217,10 +215,7 @@ class Experiment1Widget(QWidget):
 
     def __pause(self):
         self.image.clear()
-        if self.summary.total < MAX_TURN:
-            QTimer.singleShot(PAUSE_TIME, self.__show)
-        else:
-            QTimer.singleShot(PAUSE_TIME, self.__stop)
+        QTimer.singleShot(PAUSE_TIME, self.__show)
 
     def __stop(self):
         self.is_start = False
