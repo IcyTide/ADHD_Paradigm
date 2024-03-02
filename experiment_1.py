@@ -21,23 +21,25 @@ class Summary:
 
         self.correct = 0
         self.wrong = 0
+        self.miss = 0
 
     @property
     def total(self):
         return len(self.records)
 
-    @property
-    def miss(self):
-        return self.total - self.correct - self.wrong
-
-    def record(self, correct=None):
-        if correct is None:
-            self.records.append((SHOW_TIME, "miss"))
+    def record(self, correct):
+        if correct == "miss":
+            self.records.append((SHOW_TIME, correct))
+            self.start_time = time.time()
+            self.miss += 1
+        elif correct == "pass":
+            self.records.append((SHOW_TIME, correct))
             self.start_time = time.time()
         elif correct:
             cost_time = int(1000 * (time.time() - self.start_time))
             self.records[-1] = (cost_time, "correct")
             self.correct += 1
+            self.miss -= 1
         else:
             cost_time = int(1000 * (time.time() - self.start_time))
             self.records[-1] = (cost_time, "wrong")
@@ -47,7 +49,7 @@ class Summary:
     def result_args(self):
         correct_rate = round(self.correct * 100 / self.total)
         wrong_rate = round(self.wrong * 100 / self.total)
-        miss_rate = round(100 - correct_rate - wrong_rate)
+        miss_rate = round(self.miss * 100 / self.total)
         return self.correct, self.correct, correct_rate, self.wrong, wrong_rate, self.miss, miss_rate
 
 
@@ -55,8 +57,8 @@ READY_TIME = 3000
 SHOW_TIME = 800
 PAUSE_TIME = 200
 
-PRACTICE_TURN = 2
-TEST_TURN = 4
+PRACTICE_TURN = 20
+TEST_TURN = 24
 TEST_EPOCH = 6
 
 BOARD_SIZE = 2
@@ -271,6 +273,7 @@ class Experiment1Widget(QWidget):
     def start_test(self):
         self.set_prompt(random.choice(list(PROMPT2IMAGE[self.step])[:-1]))
         self.image.setText("Image Area")
+        self.table.hide()
         self.images = IMAGE_FILES[self.step].copy() * PRACTICE_TURN
         self.button.setText("Match!")
         self.button.setEnabled(False)
@@ -291,10 +294,15 @@ class Experiment1Widget(QWidget):
             self.start_test()
 
     def stop_test(self):
+        self.button.setText("继续")
+        self.button.setEnabled(True)
+        self.is_start = False
+        self.set_prompt(PRACTICE_FINISH_TEXTS[1])
         self.image.setText(
             RESULT_TEMPLATE.format(*self.summary.result_args)
         )
         self.set_table()
+        self.prepare_test()
 
     def __trigger(self):
         if self.current_image in PROMPT2IMAGE[self.step][self.current_prompt]:
@@ -311,11 +319,15 @@ class Experiment1Widget(QWidget):
 
         image = self.images.pop(random.randint(0, len(self.images) - 1))
         self.set_image(image)
-        self.summary.record()
+        if image in PROMPT2IMAGE[self.step][self.current_prompt]:
+            self.summary.record("miss")
+        else:
+            self.summary.record("pass")
 
         self.button.setEnabled(True)
         QTimer.singleShot(SHOW_TIME, self.__pause)
 
     def __pause(self):
+        self.current_image = None
         self.image.clear()
         QTimer.singleShot(PAUSE_TIME, self.__show)
