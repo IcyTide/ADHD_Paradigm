@@ -158,6 +158,7 @@ class Experiment1Widget(QWidget):
         font = self.button.font()
         font.setPointSize(30)
         self.button.setFont(font)
+        self.button.setStyleSheet("background-color: rgb(255,228,98);")
         layout.addWidget(self.button, 1)
 
     def set_table(self):
