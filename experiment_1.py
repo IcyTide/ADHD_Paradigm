@@ -196,6 +196,7 @@ class Experiment1Widget(QWidget):
 
     def __start(self):
         self.images = IMAGE_FILES[self.step].copy() * PRACTICE_TURN
+        self.table.hide()
         self.button.setText("Match!")
         self.button.setShortcut(QKeySequence(' '))
         self.button.setEnabled(False)
@@ -203,7 +204,6 @@ class Experiment1Widget(QWidget):
 
     def __stop(self, button="开始", table=False):
         self.is_start = False
-        self.table.hide()
         self.button.setText(button)
         self.button.setShortcut(QKeySequence())
         self.button.setEnabled(True)
