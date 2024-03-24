@@ -204,6 +204,7 @@ class Experiment1Widget(QWidget):
         self.button.setText("Match!")
         self.button.setShortcut(QKeySequence(' '))
         self.button.setEnabled(False)
+        self.display.setStyleSheet("background-color : transparent")
         self.is_start = True
 
     def __stop(self, button="开始", table=False):
@@ -211,6 +212,7 @@ class Experiment1Widget(QWidget):
         self.button.setText(button)
         self.button.setShortcut(QKeySequence())
         self.button.setEnabled(True)
+        self.display.setStyleSheet("background-color : transparent")
         self.display.setText(
             RESULT_TEMPLATE.format(*self.summary.result_args)
         )
@@ -273,13 +275,16 @@ class Experiment1Widget(QWidget):
 
     def stop_test(self):
         self.__stop(table=True)
+
         self.prepare_test()
 
     def __trigger(self):
         if self.current_image in PROMPT2IMAGE[self.current_prompt]:
             self.summary.record(True)
+            self.display.setStyleSheet("background-color : green")
         else:
             self.summary.record(False)
+            self.display.setStyleSheet("background-color : red")
         self.button.setEnabled(False)
 
     def __show(self):
@@ -300,5 +305,6 @@ class Experiment1Widget(QWidget):
     def __pause(self):
         self.current_image = None
         self.display.clear()
+        self.display.setStyleSheet("background-color : transparent")
         self.button.setEnabled(False)
         QTimer.singleShot(PAUSE_TIME, self.__show)
