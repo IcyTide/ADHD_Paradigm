@@ -3,6 +3,7 @@ from PySide6.QtWidgets import QApplication, QMainWindow, QStyleFactory, QVBoxLay
 import sys
 
 from experiment_1 import Experiment1Widget
+from experiment_2 import Experiment2Widget
 
 
 class MainWindow(QMainWindow):
@@ -29,6 +30,8 @@ class MainWindow(QMainWindow):
 
         self.experiment_1_widget = Experiment1Widget()
         self.tab_widget.addTab(self.experiment_1_widget, "Go-no_go")
+        self.experiment_2_widget = Experiment2Widget()
+        self.tab_widget.addTab(self.experiment_2_widget, "1_back-2_back")
 
 
 if __name__ == "__main__":

@@ -10,35 +10,27 @@ from PySide6.QtCore import QTimer
 
 
 class Step(Enum):
-    go = 0
-    no_go = 1
+    one_back = 0
+    two_back = 1
 
 
-IMAGE_FOLDER = {
-    Step.go: "assets/go",
-    Step.no_go: "assets/no_go"
-}
-IMAGE_FILES = {k: os.listdir(v) for k, v in IMAGE_FOLDER.items()}
+IMAGE_FOLDER = "assets/letter"
+
+IMAGE_FILES = os.listdir(IMAGE_FOLDER)
+
 PRACTICE_START_PROMPTS = [
-    "小朋友，你看到狮子或者老虎时请按下按键，如果你选择对了得1分，错误不得分",
-    "小朋友，你看到大象以外得其他动物时请按下按键，如果你选择对了得1分，错误不得分"
+    "小朋友，请你按下和前一个字母相同的字母。如果你选择对了加1分，错误不得分",
+    "小朋友，请你按下和前两个字母相同的字母。如果你选择对了加1分，错误不得分"
 ]
 PRACTICE_FINISH_PROMPTS = [
     "如果你已经知道怎么游戏，请点击继续",
     "如果你已经知道怎么游戏，请点击正式开始"
 ]
 TEST_PROMPTS = {
-    Step.go: "当你看到狮子或老虎时请按下按钮",
-    Step.no_go: "当你看到不是大象的动物时请按下按钮"
+    Step.one_back: "当显示字母与上一次出现的字母一致时请按下按钮",
+    Step.two_back: "当显示字母与上两次出现的字母一致时请按下按钮"
 }
 
-PROMPT2IMAGE = {
-    PRACTICE_START_PROMPTS[0]: ["lion.jpg", "tiger.jpg"],
-    PRACTICE_START_PROMPTS[1]: ["giraffe.jpg"],
-
-    TEST_PROMPTS[Step.go]: ["lion.jpg", "tiger.jpg"],
-    TEST_PROMPTS[Step.no_go]: ["giraffe.jpg"],
-}
 
 RESULT_TEMPLATE = """
 本次共计得分：{}
@@ -48,9 +40,10 @@ RESULT_TEMPLATE = """
 """.strip()
 RESULT_HEADERS = ["Turn", "Elapse", "Result"]
 
-READY_TIME = 3000
-SHOW_TIME = 800
-PAUSE_TIME = 200
+READY_TIME = 1000 * 3
+SHOW_TIME = 500
+PAUSE_TIME = 250
+BREAK_TIME = 1000 * 5
 
 PRACTICE_TURN = 2
 TEST_TURN = 2
@@ -102,7 +95,7 @@ class Summary:
                 self.miss_count, miss_rate)
 
 
-class Experiment1Widget(QWidget):
+class Experiment2Widget(QWidget):
     is_start = False
 
     start_func = None
@@ -110,18 +103,19 @@ class Experiment1Widget(QWidget):
 
     current_epoch = 0
     current_image = ""
-    current_prompt = ""
+    current_letter = ""
 
     summary = None
 
     def __init__(self):
         super().__init__()
-        self.step = Step.go
+        self.step = Step.one_back
 
         self.start_func = self.start_practice_1
         self.stop_func = self.stop_practice_1
 
         self.images = []
+        self.last_images = []
         self.display = QLabel()
         self.button = QPushButton()
         self.table = QTableWidget()
@@ -131,6 +125,17 @@ class Experiment1Widget(QWidget):
         self.prepare_practice_1()
 
         self.button.clicked.connect(self.__click)
+
+    @property
+    def correct_images(self):
+        if not self.last_images:
+            return []
+        if self.step == Step.one_back:
+            return self.last_images[-1:]
+        else:
+            if len(self.last_images) < 2:
+                return []
+            return self.last_images[-2:]
 
     def build_ui(self):
         layout = QVBoxLayout()
@@ -173,15 +178,15 @@ class Experiment1Widget(QWidget):
         self.table.show()
 
     def set_image(self, image):
+        self.last_images.append(self.current_image)
         self.current_image = image
-        pix_map = QPixmap(os.path.join(IMAGE_FOLDER[self.step], image)).scaled(
+        pix_map = QPixmap(os.path.join(IMAGE_FOLDER, image)).scaled(
             self.display.width() - BOARD_SIZE * 2, self.display.height() - BOARD_SIZE * 4,
             Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation
         )
         self.display.setPixmap(pix_map)
 
     def set_prompt(self, prompt):
-        self.current_prompt = prompt
         self.display.setText(prompt)
 
     def __click(self):
@@ -199,7 +204,8 @@ class Experiment1Widget(QWidget):
         self.button.setEnabled(True)
 
     def __start(self):
-        self.images = IMAGE_FILES[self.step].copy() * PRACTICE_TURN
+        self.last_images = []
+        self.images = IMAGE_FILES.copy() * PRACTICE_TURN
         self.table.hide()
         self.button.setText("Match!")
         self.button.setShortcut(QKeySequence(' '))
@@ -218,7 +224,7 @@ class Experiment1Widget(QWidget):
             self.set_table()
 
     def prepare_practice_1(self):
-        self.step = Step.go
+        self.step = Step.one_back
         self.start_func = self.start_practice_1
         self.set_prompt(PRACTICE_START_PROMPTS[0])
         self.__prepare()
@@ -233,7 +239,7 @@ class Experiment1Widget(QWidget):
         self.__stop(PRACTICE_FINISH_PROMPTS[0])
 
     def prepare_practice_2(self):
-        self.step = Step.no_go
+        self.step = Step.two_back
         self.start_func = self.start_practice_2
         self.set_prompt(PRACTICE_START_PROMPTS[1])
         self.__prepare()
@@ -245,10 +251,10 @@ class Experiment1Widget(QWidget):
 
     def stop_practice_2(self):
         self.__stop(PRACTICE_FINISH_PROMPTS[1])
+        self.step = Step.one_back
         self.prepare_test(PRACTICE_FINISH_PROMPTS[1])
 
     def prepare_test(self, button=None):
-        self.step = Step.go
         self.current_epoch = 0
         self.start_func = self.start_test
         self.stop_func = self.switch_test
@@ -260,23 +266,25 @@ class Experiment1Widget(QWidget):
         self.set_prompt(TEST_PROMPTS[self.step])
         QTimer.singleShot(READY_TIME, self.__show)
 
-    def switch_test(self):
-        if self.step == Step.go:
-            self.step = Step.no_go
-        else:
-            self.step = Step.go
-
-        if self.current_epoch == TEST_EPOCH:
-            self.stop_test()
-        else:
-            self.start_test()
-
     def stop_test(self):
         self.__stop(table=True)
         self.prepare_test()
 
+    def continue_test(self):
+        self.__start()
+        self.current_epoch += 1
+        QTimer.singleShot(READY_TIME, self.__show)
+
+    def switch_test(self):
+        if self.current_epoch == TEST_EPOCH:
+            self.step = Step.two_back
+            self.stop_test()
+        else:
+            self.set_prompt(TEST_PROMPTS[self.step])
+            self.__break()
+
     def __trigger(self):
-        if self.current_image in PROMPT2IMAGE[self.current_prompt]:
+        if self.current_image in self.correct_images:
             self.summary.record(True)
         else:
             self.summary.record(False)
@@ -289,7 +297,7 @@ class Experiment1Widget(QWidget):
 
         image = self.images.pop(random.randint(0, len(self.images) - 1))
         self.set_image(image)
-        if image in PROMPT2IMAGE[self.current_prompt]:
+        if image in self.correct_images:
             self.summary.record("miss")
         else:
             self.summary.record("pass")
@@ -298,7 +306,10 @@ class Experiment1Widget(QWidget):
         QTimer.singleShot(SHOW_TIME, self.__pause)
 
     def __pause(self):
-        self.current_image = None
         self.display.clear()
         self.button.setEnabled(False)
         QTimer.singleShot(PAUSE_TIME, self.__show)
+
+    def __break(self):
+        self.button.setEnabled(False)
+        QTimer.singleShot(BREAK_TIME, self.continue_test)
