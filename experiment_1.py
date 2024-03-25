@@ -288,6 +288,7 @@ class Experiment1Widget(QWidget):
         self.button.setEnabled(False)
 
     def __show(self):
+        self.display.setStyleSheet("background-color : transparent")
         if not self.images:
             self.stop_func()
             return
@@ -306,5 +307,5 @@ class Experiment1Widget(QWidget):
         self.current_image = None
         self.display.clear()
         self.display.setStyleSheet("background-color : transparent")
-        self.button.setEnabled(False)
+        # self.button.setEnabled(False)
         QTimer.singleShot(PAUSE_TIME, self.__show)

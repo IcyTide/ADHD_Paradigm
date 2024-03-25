@@ -42,7 +42,7 @@ RESULT_HEADERS = ["Turn", "Elapse", "Result"]
 
 READY_TIME = 1000 * 3
 SHOW_TIME = 500
-PAUSE_TIME = 250
+PAUSE_TIME = 1500
 BREAK_TIME = 1000 * 5
 
 PRACTICE_TURN = 2
@@ -295,6 +295,7 @@ class Experiment2Widget(QWidget):
         self.button.setEnabled(False)
 
     def __show(self):
+        self.display.setStyleSheet("background-color : transparent")
         if not self.images:
             self.stop_func()
             return
@@ -312,7 +313,7 @@ class Experiment2Widget(QWidget):
     def __pause(self):
         self.display.clear()
         self.display.setStyleSheet("background-color : transparent")
-        self.button.setEnabled(False)
+        # self.button.setEnabled(False)
         QTimer.singleShot(PAUSE_TIME, self.__show)
 
     def __break(self):
