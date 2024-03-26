@@ -198,8 +198,8 @@ class Experiment1Widget(QWidget):
             self.button.setText("开始")
         self.button.setEnabled(True)
 
-    def __start(self):
-        self.images = IMAGE_FILES[self.step].copy() * PRACTICE_TURN
+    def __start(self, times):
+        self.images = IMAGE_FILES[self.step].copy() * times
         self.table.hide()
         self.button.setText("Match!")
         self.button.setShortcut(QKeySequence(' '))
@@ -227,7 +227,7 @@ class Experiment1Widget(QWidget):
 
     def start_practice_1(self):
         self.stop_func = self.stop_practice_1
-        self.__start()
+        self.__start(PRACTICE_TURN)
         self.__show()
 
     def stop_practice_1(self):
@@ -242,7 +242,7 @@ class Experiment1Widget(QWidget):
 
     def start_practice_2(self):
         self.stop_func = self.stop_practice_2
-        self.__start()
+        self.__start(PRACTICE_TURN)
         self.__show()
 
     def stop_practice_2(self):
@@ -257,7 +257,7 @@ class Experiment1Widget(QWidget):
         self.__prepare(button)
 
     def start_test(self):
-        self.__start()
+        self.__start(TEST_TURN)
         self.current_epoch += 1
         self.set_prompt(TEST_PROMPTS[self.step])
         QTimer.singleShot(READY_TIME, self.__show)

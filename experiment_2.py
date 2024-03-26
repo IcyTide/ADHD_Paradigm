@@ -49,6 +49,8 @@ PRACTICE_TURN = 2
 TEST_TURN = 2
 TEST_EPOCH = 2
 
+SPLIT_RATE = 0.3
+
 BOARD_SIZE = 2
 
 
@@ -137,6 +139,40 @@ class Experiment2Widget(QWidget):
                 return []
             return self.last_images[-2:]
 
+    def shuffle_images(self, times):
+        n = len(IMAGE_FILES) * times
+        back = 1 if self.step == Step.one_back else 2
+
+        images = []
+        for _ in range(n - int(n * SPLIT_RATE)):
+            if len(images) < back:
+                prefix = images
+            else:
+                prefix = images[-back:]
+
+            letters = [e for e in IMAGE_FILES if e not in prefix]
+            letter = random.choice(letters)
+
+            images.append(letter)
+
+        while len(images) < n:
+            i = random.randint(1, len(images) - 1)
+            if i < back:
+                prefix = images[:i]
+                suffix = images[i: i + back]
+            elif i > len(images) - back:
+                prefix = images[i - back: i]
+                suffix = images[i:]
+            else:
+                prefix = images[i - back: i]
+                suffix = images[i: i + back]
+
+            if letters := [e for e in prefix if e not in suffix]:
+                letter = random.choice(letters)
+                images.insert(i, letter)
+
+        return images
+
     def build_ui(self):
         layout = QVBoxLayout()
         self.setLayout(layout)
@@ -203,9 +239,9 @@ class Experiment2Widget(QWidget):
             self.button.setText("开始")
         self.button.setEnabled(True)
 
-    def __start(self):
+    def __start(self, times):
         self.last_images = []
-        self.images = IMAGE_FILES.copy() * PRACTICE_TURN
+        self.images = self.shuffle_images(times)
         self.table.hide()
         self.button.setText("Match!")
         self.button.setShortcut(QKeySequence(' '))
@@ -233,7 +269,7 @@ class Experiment2Widget(QWidget):
 
     def start_practice_1(self):
         self.stop_func = self.stop_practice_1
-        self.__start()
+        self.__start(PRACTICE_TURN)
         self.__show()
 
     def stop_practice_1(self):
@@ -248,7 +284,7 @@ class Experiment2Widget(QWidget):
 
     def start_practice_2(self):
         self.stop_func = self.stop_practice_2
-        self.__start()
+        self.__start(PRACTICE_TURN)
         self.__show()
 
     def stop_practice_2(self):
@@ -263,7 +299,7 @@ class Experiment2Widget(QWidget):
         self.__prepare(button)
 
     def start_test(self):
-        self.__start()
+        self.__start(TEST_TURN)
         self.current_epoch += 1
         self.set_prompt(TEST_PROMPTS[self.step])
         QTimer.singleShot(READY_TIME, self.__show)
@@ -273,7 +309,7 @@ class Experiment2Widget(QWidget):
         self.prepare_test()
 
     def continue_test(self):
-        self.__start()
+        self.__start(TEST_TURN)
         self.current_epoch += 1
         QTimer.singleShot(READY_TIME, self.__show)
 
