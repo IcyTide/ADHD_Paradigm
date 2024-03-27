@@ -348,7 +348,7 @@ class Experiment2Widget(QWidget):
 
     def __pause(self):
         self.display.clear()
-        self.display.setStyleSheet("background-color : transparent")
+        # self.display.setStyleSheet("background-color : transparent")
         # self.button.setEnabled(False)
         QTimer.singleShot(PAUSE_TIME, self.__show)
 
