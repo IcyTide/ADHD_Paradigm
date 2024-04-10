@@ -279,13 +279,13 @@ class Experiment1Widget(QWidget):
         self.prepare_test()
 
     def __trigger(self):
+        self.button.setEnabled(False)
         if self.current_image in PROMPT2IMAGE[self.current_prompt]:
             self.summary.record(True)
             self.display.setStyleSheet("background-color : green")
         else:
             self.summary.record(False)
             self.display.setStyleSheet("background-color : red")
-        self.button.setEnabled(False)
 
     def __show(self):
         self.display.setStyleSheet("background-color : transparent")

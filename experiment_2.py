@@ -322,13 +322,13 @@ class Experiment2Widget(QWidget):
             self.__break()
 
     def __trigger(self):
+        self.button.setEnabled(False)
         if self.current_image in self.correct_images:
             self.summary.record(True)
             self.display.setStyleSheet("background-color : green")
         else:
             self.summary.record(False)
             self.display.setStyleSheet("background-color : red")
-        self.button.setEnabled(False)
 
     def __show(self):
         self.display.setStyleSheet("background-color : transparent")
