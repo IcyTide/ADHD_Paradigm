@@ -104,6 +104,7 @@ class Summary:
 
 class Experiment1Widget(QWidget):
     is_start = False
+    is_click = False
 
     start_func = None
     stop_func = None
@@ -304,7 +305,6 @@ class Experiment1Widget(QWidget):
         QTimer.singleShot(SHOW_TIME, self.__pause)
 
     def __pause(self):
-        self.current_image = None
         self.display.clear()
         # self.display.setStyleSheet("background-color : transparent")
         # self.button.setEnabled(False)
