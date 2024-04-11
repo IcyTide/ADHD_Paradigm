@@ -140,11 +140,10 @@ class Experiment2Widget(QWidget):
             return self.last_images[-2:]
 
     def shuffle_images(self, times):
-        n = len(IMAGE_FILES) * times
         back = 1 if self.step == Step.one_back else 2
 
         images = []
-        for _ in range(n - int(n * SPLIT_RATE)):
+        for _ in range(times - int(times * SPLIT_RATE)):
             if len(images) < back:
                 prefix = images
             else:
@@ -155,7 +154,7 @@ class Experiment2Widget(QWidget):
 
             images.append(letter)
 
-        while len(images) < n:
+        while len(images) < times:
             i = random.randint(1, len(images) - 1)
             if i < back:
                 prefix = images[:i]
@@ -315,7 +314,10 @@ class Experiment2Widget(QWidget):
 
     def switch_test(self):
         if self.current_epoch == TEST_EPOCH:
-            self.step = Step.two_back
+            if self.step == Step.one_back:
+                self.step = Step.two_back
+            else:
+                self.step = Step.one_back
             self.stop_test()
         else:
             self.set_prompt(TEST_PROMPTS[self.step])
