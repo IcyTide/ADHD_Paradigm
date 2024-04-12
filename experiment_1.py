@@ -200,7 +200,7 @@ class Experiment1Widget(QWidget):
         self.button.setEnabled(True)
 
     def __start(self, times):
-        self.images = IMAGE_FILES[self.step].copy() * times
+        self.images = IMAGE_FILES[self.step].copy() * (times // len(IMAGE_FILES[self.step]))
         self.table.hide()
         self.button.setText("Match!")
         self.button.setShortcut(QKeySequence(' '))

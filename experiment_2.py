@@ -40,7 +40,7 @@ RESULT_TEMPLATE = """
 """.strip()
 RESULT_HEADERS = ["Turn", "Elapse", "Result"]
 
-READY_TIME = 1000 * 3
+READY_TIME = 1000 * 10
 SHOW_TIME = 1000
 PAUSE_TIME = 1500
 BREAK_TIME = 1000 * 30
