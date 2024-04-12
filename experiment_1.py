@@ -54,7 +54,7 @@ PAUSE_TIME = 200
 
 PRACTICE_TURN = 20
 TEST_TURN = 24
-TEST_EPOCH = 6
+TEST_EPOCH = 6 * 2
 
 BOARD_SIZE = 2
 
@@ -73,23 +73,23 @@ class Summary:
     def total(self):
         return len(self.records)
 
-    def record(self, correct):
+    def record(self, correct, step):
         if correct == "miss":
-            self.records.append((SHOW_TIME, correct))
+            self.records.append((SHOW_TIME, correct, step))
             self.start_time = time.time()
             self.miss_count += 1
         elif correct == "pass":
-            self.records.append((SHOW_TIME, correct))
+            self.records.append((SHOW_TIME, correct, step))
             self.start_time = time.time()
             self.pass_count += 1
         elif correct:
             cost_time = int(1000 * (time.time() - self.start_time))
-            self.records[-1] = (cost_time, "correct")
+            self.records[-1] = (cost_time, "correct", step)
             self.correct_count += 1
             self.miss_count -= 1
         else:
             cost_time = int(1000 * (time.time() - self.start_time))
-            self.records[-1] = (cost_time, "wrong")
+            self.records[-1] = (cost_time, "wrong", step)
             self.wrong_count += 1
             self.pass_count -= 1
 
@@ -150,6 +150,7 @@ class Experiment1Widget(QWidget):
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.table.setColumnCount(len(RESULT_HEADERS))
         self.table.setHorizontalHeaderLabels(RESULT_HEADERS)
+        self.table.verticalHeader().setVisible(False)
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         h_layout.addWidget(self.table, 1)
         self.table.hide()
@@ -282,10 +283,10 @@ class Experiment1Widget(QWidget):
     def __trigger(self):
         self.button.setEnabled(False)
         if self.current_image in PROMPT2IMAGE[self.current_prompt]:
-            self.summary.record(True)
+            self.summary.record(True, self.step.value)
             self.display.setStyleSheet("background-color : green")
         else:
-            self.summary.record(False)
+            self.summary.record(False, self.step.value)
             self.display.setStyleSheet("background-color : red")
 
     def __show(self):
@@ -297,9 +298,9 @@ class Experiment1Widget(QWidget):
         image = self.images.pop(random.randint(0, len(self.images) - 1))
         self.set_image(image)
         if image in PROMPT2IMAGE[self.current_prompt]:
-            self.summary.record("miss")
+            self.summary.record("miss", self.step.value)
         else:
-            self.summary.record("pass")
+            self.summary.record("pass", self.step.value)
 
         self.button.setEnabled(True)
         QTimer.singleShot(SHOW_TIME, self.__pause)

@@ -189,6 +189,7 @@ class Experiment2Widget(QWidget):
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.table.setColumnCount(len(RESULT_HEADERS))
         self.table.setHorizontalHeaderLabels(RESULT_HEADERS)
+        self.table.verticalHeader().setVisible(False)
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         h_layout.addWidget(self.table, 1)
         self.table.hide()
