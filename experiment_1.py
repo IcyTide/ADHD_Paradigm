@@ -46,7 +46,7 @@ RESULT_TEMPLATE = """
 选择错误{}个，错误率：{}%
 漏选{}个，漏选率：{}%
 """.strip()
-RESULT_HEADERS = ["Turn", "Elapse", "Result"]
+RESULT_HEADERS = ["Turn", "Elapse", "Result", "Step"]
 
 READY_TIME = 3000
 SHOW_TIME = 800
