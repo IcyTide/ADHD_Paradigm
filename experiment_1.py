@@ -172,9 +172,9 @@ class Experiment1Widget(QWidget):
 
     def set_table(self):
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
-        headers = ",".join(RESULT_HEADERS)
-        logs = (headers + "\n" +
-                "\n".join(f"{i + 1}," + ",".join(str(e) for e in row) for i, row in enumerate(self.summary.records)))
+        logs = f"{','.join(RESULT_HEADERS)}\n"
+        logs += "\n".join(f"{i + 1}," + ",".join(str(e) for e in row) for i, row in enumerate(self.summary.records))
+        logs += "\n" + "\n".join(RESULT_TEMPLATE.format(*self.summary.result_args).split("\n")[1:])
         with open(os.path.join(LOG_FOLDER, LOG_FORMAT.format(timestamp)), "w") as f:
             f.write(logs)
         self.table.setRowCount(self.summary.total)
