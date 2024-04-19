@@ -2,6 +2,7 @@ import os
 import random
 from enum import Enum
 import time
+import datetime
 
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QPushButton, QLabel, QTableWidget, QAbstractItemView, \
     QTableWidgetItem, QHeaderView, QHBoxLayout
@@ -16,6 +17,10 @@ class Step(Enum):
 
 IMAGE_FOLDER = "assets/letter"
 
+LOG_FOLDER = "logs/1_back-2_back"
+if not os.path.exists(LOG_FOLDER):
+    os.makedirs(LOG_FOLDER)
+LOG_FORMAT = "{}-{}.csv"
 IMAGE_FILES = os.listdir(IMAGE_FOLDER)
 
 PRACTICE_START_PROMPTS = [
@@ -38,12 +43,16 @@ RESULT_TEMPLATE = """
 选择错误{}个，错误率：{}%
 漏选{}个，漏选率：{}%
 """.strip()
+RESULT_TEMPLATES = {
+    Step.one_back: "本次实验结束\n" + RESULT_TEMPLATE,
+    Step.two_back: "实验仍未结束，请继续\n" + RESULT_TEMPLATE
+}
 RESULT_HEADERS = ["Turn", "Elapse", "Result"]
 
 READY_TIME = 1000 * 10
 SHOW_TIME = 1000
 PAUSE_TIME = 1500
-BREAK_TIME = 1000 * 30
+BREAK_COUNT = 15
 
 PRACTICE_TURN = 20
 TEST_TURN = 10
@@ -102,6 +111,8 @@ class Experiment2Widget(QWidget):
 
     start_func = None
     stop_func = None
+
+    current_counter = BREAK_COUNT
 
     current_epoch = 0
     current_image = ""
@@ -203,6 +214,12 @@ class Experiment2Widget(QWidget):
         layout.addWidget(self.button, 1)
 
     def set_table(self):
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+        headers = ",".join(RESULT_HEADERS)
+        logs = (headers + "\n" +
+                "\n".join(f"{i + 1}," + ",".join(str(e) for e in row) for i, row in enumerate(self.summary.records)))
+        with open(os.path.join(LOG_FOLDER, LOG_FORMAT.format(self.step.name, timestamp)), "w") as f:
+            f.write(logs)
         self.table.setRowCount(self.summary.total)
 
         for i, row in enumerate(self.summary.records):
@@ -256,7 +273,7 @@ class Experiment2Widget(QWidget):
         self.button.setEnabled(True)
         self.display.setStyleSheet("background-color : transparent")
         self.display.setText(
-            RESULT_TEMPLATE.format(*self.summary.result_args)
+            RESULT_TEMPLATES[self.step].format(*self.summary.result_args)
         )
         if table:
             self.set_table()
@@ -308,11 +325,6 @@ class Experiment2Widget(QWidget):
         self.__stop(table=True)
         self.prepare_test()
 
-    def continue_test(self):
-        self.__start(TEST_TURN)
-        self.current_epoch += 1
-        QTimer.singleShot(READY_TIME, self.__show)
-
     def switch_test(self):
         if self.current_epoch == TEST_EPOCH:
             if self.step == Step.one_back:
@@ -357,4 +369,10 @@ class Experiment2Widget(QWidget):
 
     def __break(self):
         self.button.setEnabled(False)
-        QTimer.singleShot(BREAK_TIME, self.continue_test)
+        self.set_prompt(f"下一轮倒计时：{self.current_counter}")
+        self.current_counter -= 1
+        if self.current_counter <= 0:
+            QTimer.singleShot(1000, self.__break)
+        else:
+            self.current_counter = BREAK_COUNT
+            QTimer.singleShot(1000, self.start_test)

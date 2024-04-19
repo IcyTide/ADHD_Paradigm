@@ -1,3 +1,4 @@
+import datetime
 import os
 import random
 from enum import Enum
@@ -18,6 +19,11 @@ IMAGE_FOLDER = {
     Step.go: "assets/go",
     Step.no_go: "assets/no_go"
 }
+LOG_FOLDER = "logs/Go-no_go"
+if not os.path.exists(LOG_FOLDER):
+    os.makedirs(LOG_FOLDER)
+LOG_FORMAT = "{}.csv"
+
 IMAGE_FILES = {k: os.listdir(v) for k, v in IMAGE_FOLDER.items()}
 PRACTICE_START_PROMPTS = [
     "小朋友，你看到狮子或者老虎时请按下按键，如果你选择对了得1分，错误不得分",
@@ -41,6 +47,7 @@ PROMPT2IMAGE = {
 }
 
 RESULT_TEMPLATE = """
+本次实验结束
 本次共计得分：{}
 选择正确{}个，正确率：{}%
 选择错误{}个，错误率：{}%
@@ -164,6 +171,12 @@ class Experiment1Widget(QWidget):
         layout.addWidget(self.button, 1)
 
     def set_table(self):
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+        headers = ",".join(RESULT_HEADERS)
+        logs = (headers + "\n" +
+                "\n".join(f"{i + 1}," + ",".join(str(e) for e in row) for i, row in enumerate(self.summary.records)))
+        with open(os.path.join(LOG_FOLDER, LOG_FORMAT.format(timestamp)), "w") as f:
+            f.write(logs)
         self.table.setRowCount(self.summary.total)
 
         for i, row in enumerate(self.summary.records):
@@ -283,10 +296,10 @@ class Experiment1Widget(QWidget):
     def __trigger(self):
         self.button.setEnabled(False)
         if self.current_image in PROMPT2IMAGE[self.current_prompt]:
-            self.summary.record(True, self.step.value)
+            self.summary.record(True, self.step.name)
             self.display.setStyleSheet("background-color : green")
         else:
-            self.summary.record(False, self.step.value)
+            self.summary.record(False, self.step.name)
             self.display.setStyleSheet("background-color : red")
 
     def __show(self):
@@ -298,9 +311,9 @@ class Experiment1Widget(QWidget):
         image = self.images.pop(random.randint(0, len(self.images) - 1))
         self.set_image(image)
         if image in PROMPT2IMAGE[self.current_prompt]:
-            self.summary.record("miss", self.step.value)
+            self.summary.record("miss", self.step.name)
         else:
-            self.summary.record("pass", self.step.value)
+            self.summary.record("pass", self.step.name)
 
         self.button.setEnabled(True)
         QTimer.singleShot(SHOW_TIME, self.__pause)
