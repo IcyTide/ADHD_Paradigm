@@ -33,6 +33,18 @@ class MainWindow(QMainWindow):
         self.experiment_2_widget = Experiment2Widget()
         self.tab_widget.addTab(self.experiment_2_widget, "1_back-2_back")
 
+        self.tab_widget.tabBar().tabBarClicked.connect(self.tab_selected)
+
+        self.experiment_1_widget.prepare_practice_1()
+
+    def tab_selected(self, index):
+        if index == 0:
+            self.experiment_2_widget.media_player.stop()
+            self.experiment_1_widget.prepare_practice_1()
+        elif index == 1:
+            self.experiment_1_widget.media_player.stop()
+            self.experiment_2_widget.prepare_practice_1()
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

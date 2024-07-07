@@ -4,10 +4,11 @@ from enum import Enum
 import time
 import datetime
 
+from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QPushButton, QLabel, QTableWidget, QAbstractItemView, \
     QTableWidgetItem, QHeaderView, QHBoxLayout
 from PySide6.QtGui import QPixmap, Qt, QKeySequence
-from PySide6.QtCore import QTimer
+from PySide6.QtCore import QTimer, QUrl
 
 
 class Step(Enum):
@@ -24,18 +25,14 @@ LOG_FORMAT = "{}-{}.csv"
 IMAGE_FILES = os.listdir(IMAGE_FOLDER)
 
 PRACTICE_START_PROMPTS = [
-    "小朋友，请你按下和前一个字母相同的字母。如果你选择对了加1分，错误不得分",
-    "小朋友，请你按下和前两个字母相同的字母。如果你选择对了加1分，错误不得分"
+    ("小朋友，请你按下和前一个字母相同的字母。如果你选择对了加1分，错误不得分", QUrl.fromLocalFile("assets/media/go.wav")),
+    ("小朋友，请你按下和前两个字母相同的字母。如果你选择对了加1分，错误不得分", QUrl.fromLocalFile("assets/media/go.wav"))
 ]
-PRACTICE_FINISH_PROMPTS = [
-    "如果你已经知道怎么游戏，请点击继续",
-    "如果你已经知道怎么游戏，请点击正式开始"
-]
+PRACTICE_FINISH_PROMPT = "如果你已经知道怎么游戏，请点击继续"
 TEST_PROMPTS = {
     Step.one_back: "当显示字母与上一次出现的字母一致时请按下按钮",
     Step.two_back: "当显示字母与上两次出现的字母一致时请按下按钮"
 }
-
 
 RESULT_TEMPLATE = """
 本次共计得分：{}
@@ -44,18 +41,18 @@ RESULT_TEMPLATE = """
 漏选{}个，漏选率：{}%
 """.strip()
 RESULT_TEMPLATES = {
-    Step.one_back: "本次实验结束\n" + RESULT_TEMPLATE,
-    Step.two_back: "实验仍未结束，请继续\n" + RESULT_TEMPLATE
+    Step.one_back: "实验仍未结束，请继续\n" + RESULT_TEMPLATE,
+    Step.two_back: "本次实验结束\n" + RESULT_TEMPLATE
 }
-RESULT_HEADERS = ["Turn", "Elapse", "Result"]
+RESULT_HEADERS = ["Turn", "Elapse", "Result", "Step"]
 
-READY_TIME = 1000 * 10
+READY_TIME = 3000
 SHOW_TIME = 1000
 PAUSE_TIME = 1500
 BREAK_COUNT = 15
 
-PRACTICE_TURN = 20
-TEST_TURN = 10
+PRACTICE_TURN = 2
+TEST_TURN = 2
 TEST_EPOCH = 3
 
 SPLIT_RATE = 0.3
@@ -77,23 +74,23 @@ class Summary:
     def total(self):
         return len(self.records)
 
-    def record(self, correct):
+    def record(self, correct, step):
         if correct == "miss":
-            self.records.append((SHOW_TIME, correct))
+            self.records.append((SHOW_TIME, correct, step))
             self.start_time = time.time()
             self.miss_count += 1
         elif correct == "pass":
-            self.records.append((SHOW_TIME, correct))
+            self.records.append((SHOW_TIME, correct, step))
             self.start_time = time.time()
             self.pass_count += 1
         elif correct:
             cost_time = int(1000 * (time.time() - self.start_time))
-            self.records[-1] = (cost_time, "correct")
+            self.records[-1] = (cost_time, "correct", step)
             self.correct_count += 1
             self.miss_count -= 1
         else:
             cost_time = int(1000 * (time.time() - self.start_time))
-            self.records[-1] = (cost_time, "wrong")
+            self.records[-1] = (cost_time, "wrong", step)
             self.wrong_count += 1
             self.pass_count -= 1
 
@@ -108,6 +105,7 @@ class Summary:
 
 class Experiment2Widget(QWidget):
     is_start = False
+    is_practice = True
 
     start_func = None
     stop_func = None
@@ -119,6 +117,7 @@ class Experiment2Widget(QWidget):
     current_letter = ""
 
     summary = None
+    test_summary = None
 
     def __init__(self):
         super().__init__()
@@ -132,11 +131,14 @@ class Experiment2Widget(QWidget):
         self.display = QLabel()
         self.button = QPushButton()
         self.table = QTableWidget()
+        self.media_player = QMediaPlayer()
+        self.audio_output = QAudioOutput()
+        self.audio_output.setVolume(10)
+        self.media_player.setAudioOutput(self.audio_output)
 
         self.build_ui()
 
-        self.prepare_practice_1()
-
+        self.button.setShortcut(QKeySequence(' '))
         self.button.clicked.connect(self.__click)
 
     @property
@@ -216,19 +218,21 @@ class Experiment2Widget(QWidget):
     def set_table(self):
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
         logs = f"{','.join(RESULT_HEADERS)}\n"
-        logs += "\n".join(f"{i + 1}," + ",".join(str(e) for e in row) for i, row in enumerate(self.summary.records))
-        logs += "\n" + "\n".join(RESULT_TEMPLATE.format(*self.summary.result_args).split("\n")[1:])
+        logs += "\n".join(
+            f"{i + 1}," + ",".join(str(e) for e in row) for i, row in enumerate(self.test_summary.records))
+        logs += "\n" + "\n".join(RESULT_TEMPLATE.format(*self.test_summary.result_args).split("\n")[1:])
         with open(os.path.join(LOG_FOLDER, LOG_FORMAT.format(self.step.name, timestamp)), "w") as f:
             f.write(logs)
-        self.table.setRowCount(self.summary.total)
+        self.table.setRowCount(self.test_summary.total)
 
-        for i, row in enumerate(self.summary.records):
+        for i, row in enumerate(self.test_summary.records):
             self.table.setItem(i, 0, QTableWidgetItem(str(i + 1)))
             for j, e in enumerate(row):
                 self.table.setItem(i, j + 1, QTableWidgetItem(str(e)))
         self.table.resizeColumnsToContents()
-
         self.table.show()
+
+        self.button.setText("游戏结束，点击重新开始")
 
     def set_image(self, image):
         self.last_images.append(self.current_image)
@@ -240,7 +244,12 @@ class Experiment2Widget(QWidget):
         self.display.setPixmap(pix_map)
 
     def set_prompt(self, prompt):
-        self.display.setText(prompt)
+        if isinstance(prompt, tuple):
+            self.display.setText(prompt[0])
+            self.media_player.setSource(prompt[1])
+            self.media_player.play()
+        else:
+            self.display.setText(prompt)
 
     def __click(self):
         if self.is_start:
@@ -254,84 +263,105 @@ class Experiment2Widget(QWidget):
             self.button.setText(button)
         else:
             self.button.setText("开始")
+        self.button.setShortcut(QKeySequence(' '))
         self.button.setEnabled(True)
 
     def __start(self, times):
         self.last_images = []
         self.images = self.shuffle_images(times)
         self.table.hide()
-        self.button.setText("Match!")
-        self.button.setShortcut(QKeySequence(' '))
+        self.button.setText("按下")
         self.button.setEnabled(False)
         self.display.setStyleSheet("background-color : transparent")
         self.is_start = True
 
-    def __stop(self, button="开始", table=False):
+    def __stop(self):
         self.is_start = False
-        self.button.setText(button)
-        self.button.setShortcut(QKeySequence())
+        self.button.setShortcut(QKeySequence(' '))
         self.button.setEnabled(True)
         self.display.setStyleSheet("background-color : transparent")
         self.display.setText(
             RESULT_TEMPLATES[self.step].format(*self.summary.result_args)
         )
-        if table:
-            self.set_table()
 
     def prepare_practice_1(self):
+        self.test_summary = Summary()
+        self.table.hide()
+
         self.step = Step.one_back
         self.start_func = self.start_practice_1
+        self.stop_func = self.stop_practice_1
         self.set_prompt(PRACTICE_START_PROMPTS[0])
         self.__prepare()
 
     def start_practice_1(self):
-        self.stop_func = self.stop_practice_1
+        self.is_practice = True
         self.__start(PRACTICE_TURN)
         self.__show()
 
     def stop_practice_1(self):
-        self.start_func = self.prepare_practice_2
-        self.__stop(PRACTICE_FINISH_PROMPTS[0])
+        self.start_func = self.prepare_test_1
+        self.button.setText(PRACTICE_FINISH_PROMPT)
+        self.__stop()
 
-    def prepare_practice_2(self):
-        self.step = Step.two_back
-        self.start_func = self.start_practice_2
-        self.set_prompt(PRACTICE_START_PROMPTS[1])
+    def prepare_test_1(self):
+        self.current_epoch = 0
+        self.start_func = self.start_test_1
+        self.stop_func = self.stop_test_1
+        self.set_prompt(TEST_PROMPTS[self.step])
         self.__prepare()
 
-    def start_practice_2(self):
-        self.stop_func = self.stop_practice_2
-        self.__start(PRACTICE_TURN)
-        self.__show()
-
-    def stop_practice_2(self):
-        self.__stop(PRACTICE_FINISH_PROMPTS[1])
-        self.step = Step.one_back
-        self.prepare_test(PRACTICE_FINISH_PROMPTS[1])
-
-    def prepare_test(self, button=None):
-        self.current_epoch = 0
-        self.start_func = self.start_test
-        self.stop_func = self.switch_test
-        self.__prepare(button)
-
-    def start_test(self):
+    def start_test_1(self):
+        self.is_practice = False
         self.__start(TEST_TURN)
         self.current_epoch += 1
         self.set_prompt(TEST_PROMPTS[self.step])
         QTimer.singleShot(READY_TIME, self.__show)
 
-    def stop_test(self):
-        self.__stop(table=True)
-        self.prepare_test()
-
-    def switch_test(self):
+    def stop_test_1(self):
         if self.current_epoch == TEST_EPOCH:
-            if self.step == Step.one_back:
-                self.step = Step.two_back
-            else:
-                self.step = Step.one_back
-            self.stop_test()
+            self.__stop()
+            self.start_func = self.prepare_practice_2
+        else:
+            self.set_prompt(TEST_PROMPTS[self.step])
+            self.__break()
+
+    def prepare_practice_2(self):
+        self.step = Step.two_back
+        self.start_func = self.start_practice_2
+        self.stop_func = self.stop_practice_2
+        self.set_prompt(PRACTICE_START_PROMPTS[1])
+        self.__prepare()
+
+    def start_practice_2(self):
+        self.is_practice = True
+        self.__start(PRACTICE_TURN)
+        self.__show()
+
+    def stop_practice_2(self):
+        self.start_func = self.prepare_test_2
+        self.__stop()
+        self.button.setText(PRACTICE_FINISH_PROMPT)
+
+    def prepare_test_2(self):
+        self.current_epoch = 0
+        self.start_func = self.start_test_2
+        self.stop_func = self.stop_test_2
+        self.set_prompt(TEST_PROMPTS[self.step])
+        self.__prepare()
+
+    def start_test_2(self):
+        self.is_practice = False
+        self.__start(TEST_TURN)
+        self.current_epoch += 1
+        self.set_prompt(TEST_PROMPTS[self.step])
+        QTimer.singleShot(READY_TIME, self.__show)
+
+    def stop_test_2(self):
+        if self.current_epoch == TEST_EPOCH:
+            self.__stop()
+            self.start_func = self.prepare_practice_1
+            self.set_table()
         else:
             self.set_prompt(TEST_PROMPTS[self.step])
             self.__break()
@@ -339,10 +369,14 @@ class Experiment2Widget(QWidget):
     def __trigger(self):
         self.button.setEnabled(False)
         if self.current_image in self.correct_images:
-            self.summary.record(True)
+            if not self.is_practice:
+                self.test_summary.record(True, self.step.name)
+            self.summary.record(True, self.step.name)
             self.display.setStyleSheet("background-color : green")
         else:
-            self.summary.record(False)
+            if not self.is_practice:
+                self.test_summary.record(False, self.step.name)
+            self.summary.record(False, self.step.name)
             self.display.setStyleSheet("background-color : red")
 
     def __show(self):
@@ -354,10 +388,15 @@ class Experiment2Widget(QWidget):
         image = self.images.pop(random.randint(0, len(self.images) - 1))
         self.set_image(image)
         if image in self.correct_images:
-            self.summary.record("miss")
+            if not self.is_practice:
+                self.test_summary.record("miss", self.step.name)
+            self.summary.record("miss", self.step.name)
         else:
-            self.summary.record("pass")
+            if not self.is_practice:
+                self.test_summary.record("pass", self.step.name)
+            self.summary.record("pass", self.step.name)
 
+        self.button.setShortcut(QKeySequence(' '))
         self.button.setEnabled(True)
         QTimer.singleShot(SHOW_TIME, self.__pause)
 
@@ -375,4 +414,4 @@ class Experiment2Widget(QWidget):
             QTimer.singleShot(1000, self.__break)
         else:
             self.current_counter = BREAK_COUNT
-            QTimer.singleShot(1000, self.start_test)
+            QTimer.singleShot(1000, self.start_func)

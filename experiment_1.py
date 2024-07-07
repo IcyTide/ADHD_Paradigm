@@ -4,10 +4,11 @@ import random
 from enum import Enum
 import time
 
+from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QPushButton, QLabel, QTableWidget, QAbstractItemView, \
     QTableWidgetItem, QHeaderView, QHBoxLayout
 from PySide6.QtGui import QPixmap, Qt, QKeySequence
-from PySide6.QtCore import QTimer
+from PySide6.QtCore import QTimer, QUrl
 
 
 class Step(Enum):
@@ -26,8 +27,8 @@ LOG_FORMAT = "{}.csv"
 
 IMAGE_FILES = {k: os.listdir(v) for k, v in IMAGE_FOLDER.items()}
 PRACTICE_START_PROMPTS = [
-    "小朋友，你看到狮子或者老虎时请按下按键，如果你选择对了得1分，错误不得分",
-    "小朋友，你看到大象以外得其他动物时请按下按键，如果你选择对了得1分，错误不得分"
+    ("小朋友，你看到狮子或者老虎时请按下按键，如果你选择对了得1分，错误不得分", QUrl.fromLocalFile("assets/media/go.wav")),
+    ("小朋友，你看到大象以外得其他动物时请按下按键，如果你选择对了得1分，错误不得分", QUrl.fromLocalFile("assets/media/go.wav")),
 ]
 PRACTICE_FINISH_PROMPTS = [
     "如果你已经知道怎么游戏，请点击继续",
@@ -59,9 +60,9 @@ READY_TIME = 3000
 SHOW_TIME = 800
 PAUSE_TIME = 200
 
-PRACTICE_TURN = 20
-TEST_TURN = 24
-TEST_EPOCH = 6 * 2
+PRACTICE_TURN = 2
+TEST_TURN = 2
+TEST_EPOCH = 2 * 2
 
 BOARD_SIZE = 2
 
@@ -133,11 +134,14 @@ class Experiment1Widget(QWidget):
         self.display = QLabel()
         self.button = QPushButton()
         self.table = QTableWidget()
+        self.media_player = QMediaPlayer()
+        self.audio_output = QAudioOutput()
+        self.audio_output.setVolume(10)
+        self.media_player.setAudioOutput(self.audio_output)
 
         self.build_ui()
 
-        self.prepare_practice_1()
-
+        self.button.setShortcut(QKeySequence(' '))
         self.button.clicked.connect(self.__click)
 
     def build_ui(self):
@@ -187,6 +191,8 @@ class Experiment1Widget(QWidget):
 
         self.table.show()
 
+        self.button.setText("游戏结束，点击重新开始")
+
     def set_image(self, image):
         self.current_image = image
         pix_map = QPixmap(os.path.join(IMAGE_FOLDER[self.step], image)).scaled(
@@ -197,7 +203,12 @@ class Experiment1Widget(QWidget):
 
     def set_prompt(self, prompt):
         self.current_prompt = prompt
-        self.display.setText(prompt)
+        if isinstance(prompt, tuple):
+            self.display.setText(prompt[0])
+            self.media_player.setSource(prompt[1])
+            self.media_player.play()
+        else:
+            self.display.setText(prompt)
 
     def __click(self):
         if self.is_start:
@@ -211,21 +222,20 @@ class Experiment1Widget(QWidget):
             self.button.setText(button)
         else:
             self.button.setText("开始")
+        self.button.setShortcut(QKeySequence(' '))
         self.button.setEnabled(True)
 
     def __start(self, times):
         self.images = IMAGE_FILES[self.step].copy() * (times // len(IMAGE_FILES[self.step]))
         self.table.hide()
-        self.button.setText("Match!")
-        self.button.setShortcut(QKeySequence(' '))
+        self.button.setText("按下")
         self.button.setEnabled(False)
         self.display.setStyleSheet("background-color : transparent")
         self.is_start = True
 
-    def __stop(self, button="开始", table=False):
+    def __stop(self, table=False):
         self.is_start = False
-        self.button.setText(button)
-        self.button.setShortcut(QKeySequence())
+        self.button.setShortcut(QKeySequence(' '))
         self.button.setEnabled(True)
         self.display.setStyleSheet("background-color : transparent")
         self.display.setText(
@@ -237,39 +247,42 @@ class Experiment1Widget(QWidget):
     def prepare_practice_1(self):
         self.step = Step.go
         self.start_func = self.start_practice_1
+        self.stop_func = self.stop_practice_1
         self.set_prompt(PRACTICE_START_PROMPTS[0])
         self.__prepare()
 
     def start_practice_1(self):
-        self.stop_func = self.stop_practice_1
         self.__start(PRACTICE_TURN)
         self.__show()
 
     def stop_practice_1(self):
         self.start_func = self.prepare_practice_2
-        self.__stop(PRACTICE_FINISH_PROMPTS[0])
+        self.button.setText(PRACTICE_FINISH_PROMPTS[0])
+        self.__stop()
 
     def prepare_practice_2(self):
         self.step = Step.no_go
         self.start_func = self.start_practice_2
+        self.stop_func = self.stop_practice_2
         self.set_prompt(PRACTICE_START_PROMPTS[1])
         self.__prepare()
 
     def start_practice_2(self):
-        self.stop_func = self.stop_practice_2
         self.__start(PRACTICE_TURN)
         self.__show()
 
     def stop_practice_2(self):
-        self.__stop(PRACTICE_FINISH_PROMPTS[1])
-        self.prepare_test(PRACTICE_FINISH_PROMPTS[1])
+        self.start_func = self.prepare_test
+        self.button.setText(PRACTICE_FINISH_PROMPTS[1])
+        self.__stop()
 
-    def prepare_test(self, button=None):
+    def prepare_test(self):
         self.step = Step.go
         self.current_epoch = 0
         self.start_func = self.start_test
         self.stop_func = self.switch_test
-        self.__prepare(button)
+        self.set_prompt(TEST_PROMPTS[self.step])
+        self.__prepare()
 
     def start_test(self):
         self.__start(TEST_TURN)
@@ -290,8 +303,7 @@ class Experiment1Widget(QWidget):
 
     def stop_test(self):
         self.__stop(table=True)
-
-        self.prepare_test()
+        self.start_func = self.prepare_practice_1
 
     def __trigger(self):
         self.button.setEnabled(False)
@@ -315,6 +327,7 @@ class Experiment1Widget(QWidget):
         else:
             self.summary.record("pass", self.step.name)
 
+        self.button.setShortcut(QKeySequence(' '))
         self.button.setEnabled(True)
         QTimer.singleShot(SHOW_TIME, self.__pause)
 
