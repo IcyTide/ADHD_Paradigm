@@ -242,6 +242,7 @@ class Experiment1Widget(QWidget):
         self.current_prompt = prompt
         if isinstance(prompt, tuple):
             self.display.setText(prompt[0])
+            self.media_player.stop()
             self.media_player.setSource(prompt[1])
             self.media_player.play()
         else:

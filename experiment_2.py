@@ -294,6 +294,7 @@ class Experiment2Widget(QWidget):
     def set_button(self, prompt):
         if isinstance(prompt, tuple):
             self.button.setText(prompt[0])
+            self.media_player.stop()
             self.media_player.setSource(prompt[1])
             self.media_player.play()
         else:
