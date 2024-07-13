@@ -1,14 +1,15 @@
+import copy
 import datetime
 import os
 import random
-from enum import Enum
 import time
+from enum import Enum
 
+from PySide6.QtCore import QTimer, QUrl
+from PySide6.QtGui import QPixmap, Qt, QKeySequence
 from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QPushButton, QLabel, QTableWidget, QAbstractItemView, \
     QTableWidgetItem, QHeaderView, QHBoxLayout
-from PySide6.QtGui import QPixmap, Qt, QKeySequence
-from PySide6.QtCore import QTimer, QUrl
 
 
 class Step(Enum):
@@ -27,17 +28,19 @@ LOG_FORMAT = "{}.csv"
 
 IMAGE_FILES = {k: os.listdir(v) for k, v in IMAGE_FOLDER.items()}
 PRACTICE_START_PROMPTS = [
-    ("小朋友，你看到狮子或者老虎时请按下按键，如果你选择对了得1分，错误不得分", QUrl.fromLocalFile("assets/media/go.wav")),
-    ("小朋友，你看到大象以外得其他动物时请按下按键，如果你选择对了得1分，错误不得分", QUrl.fromLocalFile("assets/media/go.wav")),
+    ("小朋友，你看到狮子或者老虎时请按下按键，如果你选择对了得1分，错误不得分",
+     copy.deepcopy(QUrl.fromLocalFile("assets/media/go.wav"))),
+    ("小朋友，你看到大象以外得其他动物时请按下按键，如果你选择对了得1分，错误不得分",
+     copy.deepcopy(QUrl.fromLocalFile("assets/media/no_go.wav"))),
 ]
-PRACTICE_FINISH_PROMPTS = [
-    "如果你已经知道怎么游戏，请点击继续",
-    "如果你已经知道怎么游戏，请点击正式开始"
-]
+START_PROMPT = ("如果你已经知道怎么游戏，请点击正式开始", copy.deepcopy(QUrl.fromLocalFile("assets/media/start.wav")))
+CONTINUE_PROMPT = ("如果你已经知道怎么游戏，请点击继续", copy.deepcopy(QUrl.fromLocalFile("assets/media/continue.wav")))
 TEST_PROMPTS = {
     Step.go: "当你看到狮子或老虎时请按下按钮",
     Step.no_go: "当你看到不是大象的动物时请按下按钮"
 }
+
+BARS = ["练习1", "练习2", "Go", "NoGo", "Go", "NoGo", "Go", "NoGo", "结束"]
 
 PROMPT2IMAGE = {
     PRACTICE_START_PROMPTS[0]: ["lion.jpg", "tiger.jpg"],
@@ -62,7 +65,7 @@ PAUSE_TIME = 200
 
 PRACTICE_TURN = 2
 TEST_TURN = 2
-TEST_EPOCH = 2 * 2
+TEST_EPOCH = 3 * 2
 
 BOARD_SIZE = 2
 
@@ -110,6 +113,39 @@ class Summary:
                 self.miss_count, miss_rate)
 
 
+class ProgressBar(QWidget):
+    def __init__(self):
+        super().__init__()
+        layout = QHBoxLayout()
+        self.current_index = 0
+        self.setLayout(layout)
+
+        self.bars = []
+        for bar in BARS:
+            label = QLabel()
+            label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            label.setWordWrap(True)
+            font = label.font()
+            font.setPointSize(20)
+            label.setFont(font)
+            label.setText(bar)
+            self.bars.append(label)
+            layout.addWidget(label)
+
+    def highlight_first(self):
+        self.current_index = 0
+        for i, bar in enumerate(self.bars):
+            if i:
+                bar.setStyleSheet("")
+            else:
+                bar.setStyleSheet("background-color: rgb(255,228,98);")
+
+    def highlight_next(self):
+        self.bars[self.current_index].setStyleSheet("")
+        self.current_index += 1
+        self.bars[self.current_index].setStyleSheet("background-color: rgb(255,228,98);")
+
+
 class Experiment1Widget(QWidget):
     is_start = False
     is_click = False
@@ -131,6 +167,7 @@ class Experiment1Widget(QWidget):
         self.stop_func = self.stop_practice_1
 
         self.images = []
+        self.progress_bar = ProgressBar()
         self.display = QLabel()
         self.button = QPushButton()
         self.table = QTableWidget()
@@ -147,6 +184,7 @@ class Experiment1Widget(QWidget):
     def build_ui(self):
         layout = QVBoxLayout()
         self.setLayout(layout)
+        layout.addWidget(self.progress_bar, 1)
 
         h_layout = QHBoxLayout()
 
@@ -155,7 +193,6 @@ class Experiment1Widget(QWidget):
         font = self.display.font()
         font.setPointSize(30)
         self.display.setFont(font)
-        self.display.setStyleSheet(F"border: {BOARD_SIZE} solid black")
         h_layout.addWidget(self.display, 2)
 
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
@@ -210,6 +247,14 @@ class Experiment1Widget(QWidget):
         else:
             self.display.setText(prompt)
 
+    def set_button(self, prompt):
+        if isinstance(prompt, tuple):
+            self.button.setText(prompt[0])
+            self.media_player.setSource(prompt[1])
+            self.media_player.play()
+        else:
+            self.button.setText(prompt)
+
     def __click(self):
         if self.is_start:
             self.__trigger()
@@ -245,6 +290,9 @@ class Experiment1Widget(QWidget):
             self.set_table()
 
     def prepare_practice_1(self):
+        self.progress_bar.highlight_first()
+        self.table.hide()
+
         self.step = Step.go
         self.start_func = self.start_practice_1
         self.stop_func = self.stop_practice_1
@@ -257,10 +305,11 @@ class Experiment1Widget(QWidget):
 
     def stop_practice_1(self):
         self.start_func = self.prepare_practice_2
-        self.button.setText(PRACTICE_FINISH_PROMPTS[0])
+        self.set_button(CONTINUE_PROMPT)
         self.__stop()
 
     def prepare_practice_2(self):
+        self.progress_bar.highlight_next()
         self.step = Step.no_go
         self.start_func = self.start_practice_2
         self.stop_func = self.stop_practice_2
@@ -273,10 +322,11 @@ class Experiment1Widget(QWidget):
 
     def stop_practice_2(self):
         self.start_func = self.prepare_test
-        self.button.setText(PRACTICE_FINISH_PROMPTS[1])
+        self.set_button(START_PROMPT)
         self.__stop()
 
     def prepare_test(self):
+        self.progress_bar.highlight_next()
         self.step = Step.go
         self.current_epoch = 0
         self.start_func = self.start_test
@@ -299,9 +349,11 @@ class Experiment1Widget(QWidget):
         if self.current_epoch == TEST_EPOCH:
             self.stop_test()
         else:
+            self.progress_bar.highlight_next()
             self.start_test()
 
     def stop_test(self):
+        self.progress_bar.highlight_next()
         self.__stop(table=True)
         self.start_func = self.prepare_practice_1
 
