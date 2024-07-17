@@ -30,14 +30,14 @@ IMAGE_FILES = {k: os.listdir(v) for k, v in IMAGE_FOLDER.items()}
 PRACTICE_START_PROMPTS = [
     ("小朋友，你看到狮子或者老虎时请按下按键，如果你选择对了得1分，错误不得分",
      copy.deepcopy(QUrl.fromLocalFile("assets/media/go.wav"))),
-    ("小朋友，你看到大象以外得其他动物时请按下按键，如果你选择对了得1分，错误不得分",
+    ("小朋友，你看到大象以外的其他动物时请按下按键，如果你选择对了得1分，错误不得分",
      copy.deepcopy(QUrl.fromLocalFile("assets/media/no_go.wav"))),
 ]
 START_PROMPT = ("如果你已经知道怎么游戏，请点击正式开始", copy.deepcopy(QUrl.fromLocalFile("assets/media/start.wav")))
 CONTINUE_PROMPT = ("如果你已经知道怎么游戏，请点击继续", copy.deepcopy(QUrl.fromLocalFile("assets/media/continue.wav")))
 TEST_PROMPTS = {
-    Step.go: "当你看到狮子或老虎时请按下按钮",
-    Step.no_go: "当你看到不是大象的动物时请按下按钮"
+    Step.go: "当你看到狮子或老虎时请按下按键",
+    Step.no_go: "当你看到大象以外的其他动物时请按下按键"
 }
 
 BARS = ["练习1", "练习2", "Go", "NoGo", "Go", "NoGo", "Go", "NoGo", "结束"]
@@ -63,8 +63,8 @@ READY_TIME = 3000
 SHOW_TIME = 800
 PAUSE_TIME = 200
 
-PRACTICE_TURN = 2
-TEST_TURN = 2
+PRACTICE_TURN = 20
+TEST_TURN = 24
 TEST_EPOCH = 3 * 2
 
 BOARD_SIZE = 2
