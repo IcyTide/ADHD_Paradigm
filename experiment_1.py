@@ -106,9 +106,9 @@ class Summary:
 
     @property
     def result_args(self):
-        correct_rate = round(self.correct_count * 100 / self.total)
-        wrong_rate = round(self.wrong_count * 100 / self.total)
-        miss_rate = round(self.miss_count * 100 / self.total)
+        correct_rate = round(self.correct_count * 100 / (self.correct_count + self.miss_count))
+        wrong_rate = round(self.wrong_count * 100 / (self.wrong_count + self.pass_count))
+        miss_rate = round(self.miss_count * 100 / (self.correct_count + self.miss_count))
         return (self.correct_count, self.correct_count, correct_rate, self.wrong_count, wrong_rate,
                 self.miss_count, miss_rate)
 
