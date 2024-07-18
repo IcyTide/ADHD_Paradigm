@@ -57,7 +57,7 @@ RESULT_TEMPLATE = """
 选择错误{}个，错误率：{}%
 漏选{}个，漏选率：{}%
 """.strip()
-RESULT_HEADERS = ["Turn", "Elapse", "Result", "Step"]
+RESULT_HEADERS = ["Turn", "Start", "Click", "Result", "Step"]
 
 READY_TIME = 3000
 SHOW_TIME = 800
@@ -86,29 +86,34 @@ class Summary:
 
     def record(self, correct, step):
         if correct == "miss":
-            self.records.append((SHOW_TIME, correct, step))
-            self.start_time = time.time()
+            self.records.append([time.time(), 0, correct, step])
             self.miss_count += 1
         elif correct == "pass":
-            self.records.append((SHOW_TIME, correct, step))
-            self.start_time = time.time()
+            self.records.append([time.time(), 0, correct, step])
             self.pass_count += 1
         elif correct:
-            cost_time = int(1000 * (time.time() - self.start_time))
-            self.records[-1] = (cost_time, "correct", step)
+            self.records[-1][1] = time.time()
+            self.records[-1][2] = "correct"
             self.correct_count += 1
             self.miss_count -= 1
         else:
-            cost_time = int(1000 * (time.time() - self.start_time))
-            self.records[-1] = (cost_time, "wrong", step)
+            self.records[-1][1] = time.time()
+            self.records[-1][2] = "wrong"
             self.wrong_count += 1
             self.pass_count -= 1
 
     @property
     def result_args(self):
-        correct_rate = round(self.correct_count * 100 / (self.correct_count + self.miss_count))
-        wrong_rate = round(self.wrong_count * 100 / (self.wrong_count + self.pass_count))
-        miss_rate = round(self.miss_count * 100 / (self.correct_count + self.miss_count))
+        if self.correct_count + self.miss_count == 0:
+            correct_rate = 0
+            miss_rate = 0
+        else:
+            correct_rate = round(self.correct_count * 100 / (self.correct_count + self.miss_count))
+            miss_rate = round(self.miss_count * 100 / (self.correct_count + self.miss_count))
+        if self.wrong_count + self.pass_count == 0:
+            wrong_rate = 0
+        else:
+            wrong_rate = round(self.wrong_count * 100 / (self.wrong_count + self.pass_count))
         return (self.correct_count, self.correct_count, correct_rate, self.wrong_count, wrong_rate,
                 self.miss_count, miss_rate)
 
@@ -132,18 +137,18 @@ class ProgressBar(QWidget):
             self.bars.append(label)
             layout.addWidget(label)
 
-    def highlight_first(self):
-        self.current_index = 0
-        for i, bar in enumerate(self.bars):
-            if i:
-                bar.setStyleSheet("")
-            else:
-                bar.setStyleSheet("background-color: rgb(255,228,98);")
-
     def highlight_next(self):
         self.bars[self.current_index].setStyleSheet("")
         self.current_index += 1
         self.bars[self.current_index].setStyleSheet("background-color: rgb(255,228,98);")
+
+    def highlight_index(self, index):
+        self.current_index = index
+        for i, bar in enumerate(self.bars):
+            if i != self.current_index:
+                bar.setStyleSheet("")
+            else:
+                bar.setStyleSheet("background-color: rgb(255,228,98);")
 
 
 class Experiment1Widget(QWidget):
@@ -151,6 +156,7 @@ class Experiment1Widget(QWidget):
     is_click = False
 
     start_func = None
+    restart_func = None
     stop_func = None
 
     current_epoch = 0
@@ -170,6 +176,7 @@ class Experiment1Widget(QWidget):
         self.progress_bar = ProgressBar()
         self.display = QLabel()
         self.button = QPushButton()
+        self.restart_button = QPushButton()
         self.table = QTableWidget()
         self.media_player = QMediaPlayer()
         self.audio_output = QAudioOutput()
@@ -180,6 +187,7 @@ class Experiment1Widget(QWidget):
 
         self.button.setShortcut(QKeySequence(' '))
         self.button.clicked.connect(self.__click)
+        self.restart_button.clicked.connect(self.__restart)
 
     def build_ui(self):
         layout = QVBoxLayout()
@@ -205,11 +213,19 @@ class Experiment1Widget(QWidget):
 
         layout.addLayout(h_layout, 4)
 
+        h_layout = QHBoxLayout()
         font = self.button.font()
-        font.setPointSize(30)
+        font.setPointSize(24)
         self.button.setFont(font)
         self.button.setStyleSheet("background-color: rgb(255,228,98);")
-        layout.addWidget(self.button, 1)
+        h_layout.addWidget(self.button, 5)
+        font = self.restart_button.font()
+        font.setPointSize(24)
+        self.restart_button.setFont(font)
+        self.restart_button.setStyleSheet("background-color: rgb(255,228,98);")
+        h_layout.addWidget(self.restart_button, 1)
+        self.restart_button.setText("重新练习")
+        layout.addLayout(h_layout, 1)
 
     def set_table(self):
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
@@ -255,7 +271,10 @@ class Experiment1Widget(QWidget):
             self.media_player.play()
         else:
             self.button.setText(prompt)
-
+    
+    def __restart(self):
+        self.restart_func()
+        
     def __click(self):
         if self.is_start:
             self.__trigger()
@@ -263,6 +282,7 @@ class Experiment1Widget(QWidget):
             self.start_func()
 
     def __prepare(self, button=None):
+        self.restart_button.hide()
         self.summary = Summary()
         if button:
             self.button.setText(button)
@@ -291,11 +311,12 @@ class Experiment1Widget(QWidget):
             self.set_table()
 
     def prepare_practice_1(self):
-        self.progress_bar.highlight_first()
+        self.progress_bar.highlight_index(0)
         self.table.hide()
 
         self.step = Step.go
         self.start_func = self.start_practice_1
+        self.restart_func = self.prepare_practice_1
         self.stop_func = self.stop_practice_1
         self.set_prompt(PRACTICE_START_PROMPTS[0])
         self.__prepare()
@@ -305,14 +326,16 @@ class Experiment1Widget(QWidget):
         self.__show()
 
     def stop_practice_1(self):
+        self.restart_button.show()
         self.start_func = self.prepare_practice_2
         self.set_button(CONTINUE_PROMPT)
         self.__stop()
 
     def prepare_practice_2(self):
-        self.progress_bar.highlight_next()
+        self.progress_bar.highlight_index("练习2")
         self.step = Step.no_go
         self.start_func = self.start_practice_2
+        self.restart_func = self.prepare_practice_2
         self.stop_func = self.stop_practice_2
         self.set_prompt(PRACTICE_START_PROMPTS[1])
         self.__prepare()
@@ -322,6 +345,7 @@ class Experiment1Widget(QWidget):
         self.__show()
 
     def stop_practice_2(self):
+        self.restart_button.show()
         self.start_func = self.prepare_test
         self.set_button(START_PROMPT)
         self.__stop()

@@ -49,10 +49,10 @@ RESULT_TEMPLATES = {
     Step.one_back: "实验仍未结束，请继续\n" + RESULT_TEMPLATE,
     Step.two_back: "本次实验结束\n" + RESULT_TEMPLATE
 }
-RESULT_HEADERS = ["Turn", "Elapse", "Result", "Step"]
+RESULT_HEADERS = ["Turn", "Start", "Click", "Result", "Step"]
 
 READY_TIME = 3000
-SHOW_TIME = 1000
+SHOW_TIME = 1500
 PAUSE_TIME = 1500
 BREAK_COUNT = 10
 
@@ -81,21 +81,19 @@ class Summary:
 
     def record(self, correct, step):
         if correct == "miss":
-            self.records.append((SHOW_TIME, correct, step))
-            self.start_time = time.time()
+            self.records.append([time.time(), 0, correct, step])
             self.miss_count += 1
         elif correct == "pass":
-            self.records.append((SHOW_TIME, correct, step))
-            self.start_time = time.time()
+            self.records.append([time.time(), 0, correct, step])
             self.pass_count += 1
         elif correct:
-            cost_time = int(1000 * (time.time() - self.start_time))
-            self.records[-1] = (cost_time, "correct", step)
+            self.records[-1][1] = time.time()
+            self.records[-1][2] = "correct"
             self.correct_count += 1
             self.miss_count -= 1
         else:
-            cost_time = int(1000 * (time.time() - self.start_time))
-            self.records[-1] = (cost_time, "wrong", step)
+            self.records[-1][1] = time.time()
+            self.records[-1][2] = "wrong"
             self.wrong_count += 1
             self.pass_count -= 1
 
@@ -128,18 +126,18 @@ class ProgressBar(QWidget):
             self.bars.append(label)
             layout.addWidget(label)
 
-    def highlight_first(self):
-        self.current_index = 0
-        for i, bar in enumerate(self.bars):
-            if i:
-                bar.setStyleSheet("")
-            else:
-                bar.setStyleSheet("background-color: rgb(255,228,98);")
-
     def highlight_next(self):
         self.bars[self.current_index].setStyleSheet("")
         self.current_index += 1
         self.bars[self.current_index].setStyleSheet("background-color: rgb(255,228,98);")
+
+    def highlight_index(self, index):
+        self.current_index = index
+        for i, bar in enumerate(self.bars):
+            if i != self.current_index:
+                bar.setStyleSheet("")
+            else:
+                bar.setStyleSheet("background-color: rgb(255,228,98);")
 
 
 class Experiment2Widget(QWidget):
@@ -147,6 +145,7 @@ class Experiment2Widget(QWidget):
     is_practice = True
 
     start_func = None
+    restart_func = None
     stop_func = None
 
     current_counter = BREAK_COUNT
@@ -170,6 +169,7 @@ class Experiment2Widget(QWidget):
         self.progress_bar = ProgressBar()
         self.display = QLabel()
         self.button = QPushButton()
+        self.restart_button = QPushButton()
         self.table = QTableWidget()
         self.media_player = QMediaPlayer()
         self.audio_output = QAudioOutput()
@@ -180,6 +180,7 @@ class Experiment2Widget(QWidget):
 
         self.button.setShortcut(QKeySequence(' '))
         self.button.clicked.connect(self.__click)
+        self.restart_button.clicked.connect(self.__restart)
 
     @property
     def correct_images(self):
@@ -249,11 +250,19 @@ class Experiment2Widget(QWidget):
 
         layout.addLayout(h_layout, 4)
 
+        h_layout = QHBoxLayout()
         font = self.button.font()
-        font.setPointSize(30)
+        font.setPointSize(24)
         self.button.setFont(font)
         self.button.setStyleSheet("background-color: rgb(255,228,98);")
-        layout.addWidget(self.button, 1)
+        h_layout.addWidget(self.button, 5)
+        font = self.restart_button.font()
+        font.setPointSize(24)
+        self.restart_button.setFont(font)
+        self.restart_button.setStyleSheet("background-color: rgb(255,228,98);")
+        h_layout.addWidget(self.restart_button, 1)
+        self.restart_button.setText("重新练习")
+        layout.addLayout(h_layout, 1)
 
     def set_table(self):
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
@@ -300,6 +309,9 @@ class Experiment2Widget(QWidget):
         else:
             self.button.setText(prompt)
 
+    def __restart(self):
+        self.restart_func()
+
     def __click(self):
         if self.is_start:
             self.__trigger()
@@ -307,6 +319,7 @@ class Experiment2Widget(QWidget):
             self.start_func()
 
     def __prepare(self, button=None):
+        self.restart_button.hide()
         self.summary = Summary()
         if button:
             self.button.setText(button)
@@ -334,12 +347,13 @@ class Experiment2Widget(QWidget):
         )
 
     def prepare_practice_1(self):
-        self.progress_bar.highlight_first()
+        self.progress_bar.highlight_index(0)
         self.test_summary = Summary()
         self.table.hide()
 
         self.step = Step.one_back
         self.start_func = self.start_practice_1
+        self.restart_func = self.prepare_practice_1
         self.stop_func = self.stop_practice_1
         self.set_prompt(PRACTICE_START_PROMPTS[0])
         self.__prepare()
@@ -350,6 +364,7 @@ class Experiment2Widget(QWidget):
         self.__show()
 
     def stop_practice_1(self):
+        self.restart_button.show()
         self.start_func = self.prepare_test_1
         self.set_button(START_PROMPT)
         self.__stop()
@@ -380,9 +395,10 @@ class Experiment2Widget(QWidget):
             self.__break()
 
     def prepare_practice_2(self):
-        self.progress_bar.highlight_next()
+        self.progress_bar.highlight_index(BARS.index("练习2"))
         self.step = Step.two_back
         self.start_func = self.start_practice_2
+        self.restart_func = self.prepare_practice_2
         self.stop_func = self.stop_practice_2
         self.set_prompt(PRACTICE_START_PROMPTS[1])
         self.__prepare()
@@ -393,6 +409,7 @@ class Experiment2Widget(QWidget):
         self.__show()
 
     def stop_practice_2(self):
+        self.restart_button.show()
         self.start_func = self.prepare_test_2
         self.set_button(START_PROMPT)
         self.__stop()
