@@ -22,7 +22,7 @@ IMAGE_FOLDER = "assets/letter"
 LOG_FOLDER = "logs/1_back-2_back"
 if not os.path.exists(LOG_FOLDER):
     os.makedirs(LOG_FOLDER)
-LOG_FORMAT = "{}-{}.csv"
+
 IMAGE_FILES = os.listdir(IMAGE_FOLDER)
 
 PRACTICE_START_PROMPTS = [
@@ -49,7 +49,7 @@ RESULT_TEMPLATES = {
     Step.one_back: "实验仍未结束，请继续\n" + RESULT_TEMPLATE,
     Step.two_back: "本次实验结束\n" + RESULT_TEMPLATE
 }
-RESULT_HEADERS = ["Turn", "Start", "Click", "Result", "Step"]
+RESULT_HEADERS = ["Turn", "Elapse", "Result", "Step"]
 
 READY_TIME = 3000
 SHOW_TIME = 1500
@@ -67,6 +67,7 @@ BOARD_SIZE = 2
 
 class Summary:
     def __init__(self):
+        self.timeline = []
         self.records = []
         self.start_time = 0
 
@@ -79,21 +80,31 @@ class Summary:
     def total(self):
         return len(self.records)
 
+    def record_start(self, step):
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+        self.timeline.append(f"{step} start_time: {timestamp}")
+
+    def record_end(self, step):
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+        self.timeline.append(f"{step} end_time: {timestamp}")
+
     def record(self, correct, step):
         if correct == "miss":
-            self.records.append([time.time(), 0, correct, step])
+            self.records.append((SHOW_TIME, correct, step))
+            self.start_time = time.time()
             self.miss_count += 1
         elif correct == "pass":
-            self.records.append([time.time(), 0, correct, step])
+            self.records.append((SHOW_TIME, correct, step))
+            self.start_time = time.time()
             self.pass_count += 1
         elif correct:
-            self.records[-1][1] = time.time()
-            self.records[-1][2] = "correct"
+            cost_time = int(1000 * (time.time() - self.start_time))
+            self.records[-1] = (cost_time, "correct", step)
             self.correct_count += 1
             self.miss_count -= 1
         else:
-            self.records[-1][1] = time.time()
-            self.records[-1][2] = "wrong"
+            cost_time = int(1000 * (time.time() - self.start_time))
+            self.records[-1] = (cost_time, "wrong", step)
             self.wrong_count += 1
             self.pass_count -= 1
 
@@ -270,8 +281,10 @@ class Experiment2Widget(QWidget):
         logs += "\n".join(
             f"{i + 1}," + ",".join(str(e) for e in row) for i, row in enumerate(self.test_summary.records))
         logs += "\n" + "\n".join(RESULT_TEMPLATE.format(*self.test_summary.result_args).split("\n")[1:])
-        with open(os.path.join(LOG_FOLDER, LOG_FORMAT.format(self.step.name, timestamp)), "w") as f:
+        with open(os.path.join(LOG_FOLDER, f"{timestamp}.csv"), "w") as f:
             f.write(logs)
+        with open(os.path.join(LOG_FOLDER, f"{timestamp}.txt"), "w") as f:
+            f.write("\n".join(self.test_summary.timeline))
         self.table.setRowCount(self.test_summary.total)
 
         for i, row in enumerate(self.test_summary.records):
@@ -378,6 +391,7 @@ class Experiment2Widget(QWidget):
         self.__prepare()
 
     def start_test_1(self):
+        self.test_summary.record_start(self.step.name)
         self.is_practice = False
         self.__start(TEST_TURN)
         self.current_epoch += 1
@@ -385,6 +399,7 @@ class Experiment2Widget(QWidget):
         QTimer.singleShot(READY_TIME, self.__show)
 
     def stop_test_1(self):
+        self.test_summary.record_end(self.step.name)
         if self.current_epoch == TEST_EPOCH:
             self.__stop()
             self.set_button(CONTINUE_PROMPT)
@@ -423,6 +438,7 @@ class Experiment2Widget(QWidget):
         self.__prepare()
 
     def start_test_2(self):
+        self.test_summary.record_start(self.step.name)
         self.is_practice = False
         self.__start(TEST_TURN)
         self.current_epoch += 1
@@ -430,6 +446,7 @@ class Experiment2Widget(QWidget):
         QTimer.singleShot(READY_TIME, self.__show)
 
     def stop_test_2(self):
+        self.test_summary.record_end(self.step.name)
         self.progress_bar.highlight_next()
         if self.current_epoch == TEST_EPOCH:
             self.__stop()

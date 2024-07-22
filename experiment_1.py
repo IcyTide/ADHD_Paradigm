@@ -24,7 +24,6 @@ IMAGE_FOLDER = {
 LOG_FOLDER = "logs/Go-no_go"
 if not os.path.exists(LOG_FOLDER):
     os.makedirs(LOG_FOLDER)
-LOG_FORMAT = "{}.csv"
 
 IMAGE_FILES = {k: os.listdir(v) for k, v in IMAGE_FOLDER.items()}
 PRACTICE_START_PROMPTS = [
@@ -57,7 +56,7 @@ RESULT_TEMPLATE = """
 选择错误{}个，错误率：{}%
 漏选{}个，漏选率：{}%
 """.strip()
-RESULT_HEADERS = ["Turn", "Start", "Click", "Result", "Step"]
+RESULT_HEADERS = ["Turn", "Elapse", "Result", "Step"]
 
 READY_TIME = 3000
 SHOW_TIME = 800
@@ -72,6 +71,7 @@ BOARD_SIZE = 2
 
 class Summary:
     def __init__(self):
+        self.timeline = []
         self.records = []
         self.start_time = 0
 
@@ -84,21 +84,31 @@ class Summary:
     def total(self):
         return len(self.records)
 
+    def record_start(self, step):
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+        self.timeline.append(f"{step} start_time: {timestamp}")
+
+    def record_end(self, step):
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+        self.timeline.append(f"{step} end_time: {timestamp}")
+
     def record(self, correct, step):
         if correct == "miss":
-            self.records.append([time.time(), 0, correct, step])
+            self.records.append((SHOW_TIME, correct, step))
+            self.start_time = time.time()
             self.miss_count += 1
         elif correct == "pass":
-            self.records.append([time.time(), 0, correct, step])
+            self.records.append((SHOW_TIME, correct, step))
+            self.start_time = time.time()
             self.pass_count += 1
         elif correct:
-            self.records[-1][1] = time.time()
-            self.records[-1][2] = "correct"
+            cost_time = int(1000 * (time.time() - self.start_time))
+            self.records[-1] = (cost_time, "correct", step)
             self.correct_count += 1
             self.miss_count -= 1
         else:
-            self.records[-1][1] = time.time()
-            self.records[-1][2] = "wrong"
+            cost_time = int(1000 * (time.time() - self.start_time))
+            self.records[-1] = (cost_time, "wrong", step)
             self.wrong_count += 1
             self.pass_count -= 1
 
@@ -232,8 +242,10 @@ class Experiment1Widget(QWidget):
         logs = f"{','.join(RESULT_HEADERS)}\n"
         logs += "\n".join(f"{i + 1}," + ",".join(str(e) for e in row) for i, row in enumerate(self.summary.records))
         logs += "\n" + "\n".join(RESULT_TEMPLATE.format(*self.summary.result_args).split("\n")[1:])
-        with open(os.path.join(LOG_FOLDER, LOG_FORMAT.format(timestamp)), "w") as f:
+        with open(os.path.join(LOG_FOLDER, f"{timestamp}.csv"), "w") as f:
             f.write(logs)
+        with open(os.path.join(LOG_FOLDER, f"{timestamp}.txt"), "w") as f:
+            f.write("\n".join(self.summary.timeline))
         self.table.setRowCount(self.summary.total)
 
         for i, row in enumerate(self.summary.records):
@@ -332,7 +344,7 @@ class Experiment1Widget(QWidget):
         self.__stop()
 
     def prepare_practice_2(self):
-        self.progress_bar.highlight_index("练习2")
+        self.progress_bar.highlight_index(BARS.index("练习2"))
         self.step = Step.no_go
         self.start_func = self.start_practice_2
         self.restart_func = self.prepare_practice_2
@@ -360,12 +372,14 @@ class Experiment1Widget(QWidget):
         self.__prepare()
 
     def start_test(self):
+        self.summary.record_start(self.step.name)
         self.__start(TEST_TURN)
         self.current_epoch += 1
         self.set_prompt(TEST_PROMPTS[self.step])
         QTimer.singleShot(READY_TIME, self.__show)
 
     def switch_test(self):
+        self.summary.record_end(self.step.name)
         if self.step == Step.go:
             self.step = Step.no_go
         else:
