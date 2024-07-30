@@ -61,6 +61,7 @@ RESULT_HEADERS = ["Turn", "Elapse", "Result", "Step"]
 READY_TIME = 3000
 SHOW_TIME = 800
 PAUSE_TIME = 200
+BREAK_COUNT = 30
 
 PRACTICE_TURN = 20
 TEST_TURN = 24
@@ -168,6 +169,8 @@ class Experiment1Widget(QWidget):
     start_func = None
     restart_func = None
     stop_func = None
+
+    current_counter = BREAK_COUNT
 
     current_epoch = 0
     current_image = ""
@@ -389,7 +392,8 @@ class Experiment1Widget(QWidget):
             self.stop_test()
         else:
             self.progress_bar.highlight_next()
-            self.start_test()
+            self.set_prompt(TEST_PROMPTS[self.step])
+            self.__break()
 
     def stop_test(self):
         self.progress_bar.highlight_next()
@@ -427,3 +431,13 @@ class Experiment1Widget(QWidget):
         # self.display.setStyleSheet("background-color : transparent")
         # self.button.setEnabled(False)
         QTimer.singleShot(PAUSE_TIME, self.__show)
+
+    def __break(self):
+        self.button.setEnabled(False)
+        self.set_prompt(f"下一轮倒计时：{self.current_counter}")
+        self.current_counter -= 1
+        if self.current_counter > 0:
+            QTimer.singleShot(1000, self.__break)
+        else:
+            self.current_counter = BREAK_COUNT
+            QTimer.singleShot(1000, self.start_func)
