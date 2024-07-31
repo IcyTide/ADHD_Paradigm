@@ -81,7 +81,8 @@ class Summary:
         return len(self.records)
 
     def record_start(self, step):
-        timestamp = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+        timestamp = datetime.datetime.now() + datetime.timedelta(seconds=READY_TIME / 1000)
+        timestamp = timestamp.strftime("%Y-%m-%d-%H-%M-%S")
         self.timeline.append(f"{step} start_time: {timestamp}")
 
     def record_end(self, step):
